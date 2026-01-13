@@ -1,6 +1,6 @@
 # FactChecker 🔍
 
-This is just a test project currently!
+This is just a quickly-vibecoded test project!
 
 A web application that fact-checks social media posts using AI. Paste any social media link and get an AI-powered analysis of its truthfulness.
 

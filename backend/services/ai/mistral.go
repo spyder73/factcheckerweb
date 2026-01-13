@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -65,13 +66,9 @@ type mistralMessage struct {
 }
 
 type mistralContentPart struct {
-	Type     string           `json:"type"`
-	Text     string           `json:"text,omitempty"`
-	ImageURL *mistralImageURL `json:"image_url,omitempty"`
-}
-
-type mistralImageURL struct {
-	URL string `json:"url"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
 }
 
 type mistralResponse struct {
@@ -124,14 +121,20 @@ func (m *MistralProvider) ChatWithSystem(systemPrompt, message string) (string, 
 	return m.sendRequest(m.model, messages)
 }
 
-func (m *MistralProvider) AnalyzeImage(imageURL string, prompt string) (string, error) {
-	// Pixtral uses content array format for images
+// AnalyzeImage analyzes an image - supports both URLs and base64 data URIs
+func (m *MistralProvider) AnalyzeImage(imageData string, prompt string) (string, error) {
+	// Check if it's a base64 data URI or a regular URL
+	imageURL := imageData
+	if !strings.HasPrefix(imageData, "data:") && !strings.HasPrefix(imageData, "http") {
+		// Assume it's raw base64, wrap it
+		imageURL = "data:image/jpeg;base64," + imageData
+	}
+
+	// Pixtral format: image_url is a string directly (not nested object)
 	content := []mistralContentPart{
 		{
-			Type: "image_url",
-			ImageURL: &mistralImageURL{
-				URL: imageURL,
-			},
+			Type:     "image_url",
+			ImageURL: imageURL,
 		},
 		{
 			Type: "text",

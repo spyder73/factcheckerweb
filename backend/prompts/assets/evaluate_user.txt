@@ -1,0 +1,41 @@
+Perform a comprehensive fact-check on the following claims from social media content.
+
+Main Claims: {{MAIN_CLAIMS}}
+
+Key Facts Presented: {{KEY_FACTS}}
+
+Overall Message: {{OVERALL_MESSAGE}}
+
+Red Flags Identified: {{RED_FLAGS}}
+
+Please analyze and provide:
+1. VERIFICATION STATUS for each claim (verified, false, misleading, partially_true, unverifiable, satire, no_claim)
+2. SUPPORTING EVIDENCE: Known facts that support the claims
+3. CONTRADICTING EVIDENCE: Known facts that contradict the claims
+4. SOURCES: Mention reputable news organizations, fact-checkers, or official sources
+5. MISSING CONTEXT: Important information that changes the meaning
+6. OVERALL VERDICT: Your assessment
+
+Return as JSON:
+{
+  "verdict": "verified|false|misleading|partially_true|unverifiable|satire|no_claim",
+  "confidence": 0.0-1.0,
+  "summary": "overall summary explaining the verdict",
+  "claims": [
+    {
+      "statement": "the claim",
+      "verdict": "verdict for this claim",
+      "explanation": "detailed explanation why",
+      "proArguments": ["supporting points"],
+      "contraArguments": ["contradicting points"]
+    }
+  ],
+  "sources": [
+    {
+      "name": "source name (e.g., Reuters, AP News, Snopes)",
+      "description": "what they reported or would report",
+      "stance": "supports|contradicts|neutral|context",
+      "credibility": "high|medium|low"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+Analyze this image from a social media post.
+
+Additional context/caption: {{CONTEXT}}
+
+Please provide:
+1. A detailed description of what is visible in the image
+2. Any text that appears in the image (transcribe exactly)
+3. Key elements and objects visible
+4. The apparent context or setting
+5. Any claims or statements being made visually
+
+Be objective and factual. Format your response as JSON:
+{
+  "description": "detailed description",
+  "textFound": "any text in image",
+  "elements": ["element1", "element2"],
+  "context": "apparent context",
+  "claims": ["claim1", "claim2"]
+}

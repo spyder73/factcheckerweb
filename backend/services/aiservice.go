@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"fact-checker/prompts"
 	"fact-checker/services/ai"
 )
 
@@ -76,49 +77,23 @@ type SourceEval struct {
 }
 
 // AnalyzeImage generates a description of image content
-func (a *AIService) AnalyzeImage(imageURL string, context string) (ImageAnalysis, error) {
-	prompt := fmt.Sprintf(`Analyze this image from a social media post.
-
-Additional context/caption: %s
-
-Please provide:
-1. A detailed description of what is visible in the image
-2. Any text that appears in the image (transcribe exactly)
-3. Key elements and objects visible
-4. The apparent context or setting
-5. Any claims or statements being made visually
-
-Be objective and factual. Format your response as JSON:
-{
-  "description": "detailed description",
-  "textFound": "any text in image",
-  "elements": ["element1", "element2"],
-  "context": "apparent context",
-  "claims": ["claim1", "claim2"]
-}`, context)
-
+// imageData can be a URL or a base64 data URI
+func (a *AIService) AnalyzeImage(imageData string, context string) (ImageAnalysis, error) {
 	var response string
 	var err error
 
-	// Use vision if supported, otherwise describe what we're analyzing
 	if a.provider.SupportsVision() {
-		response, err = a.provider.AnalyzeImage(imageURL, prompt)
+		prompt := prompts.Replace(prompts.Prompts.ImageAnalysis, map[string]string{
+			"CONTEXT": context,
+		})
+		response, err = a.provider.AnalyzeImage(imageData, prompt)
 	} else {
 		// Fallback for non-vision models
-		textPrompt := fmt.Sprintf(`I need you to analyze a social media post. 
-The post contains an image at this URL: %s
-Caption/context: %s
-
-Since you cannot see the image directly, analyze the caption and URL for any claims that can be fact-checked.
-Return your analysis as JSON:
-{
-  "description": "analysis of available text content",
-  "textFound": "",
-  "elements": [],
-  "context": "context from caption",
-  "claims": ["claims found in caption"]
-}`, imageURL, context)
-		response, err = a.provider.Chat(textPrompt)
+		prompt := prompts.Replace(prompts.Prompts.ImageAnalysisFallback, map[string]string{
+			"IMAGE_URL": imageData,
+			"CONTEXT":   context,
+		})
+		response, err = a.provider.Chat(prompt)
 	}
 
 	if err != nil {
@@ -144,24 +119,13 @@ func (a *AIService) CondenseInformation(analyses []ImageAnalysis, caption string
 		analysisTexts = append(analysisTexts, fmt.Sprintf("Media %d: %s", i+1, analysis.Description))
 	}
 
-	systemPrompt := `You are a fact-checking assistant. Your job is to extract verifiable claims from social media content. Be precise and identify specific factual claims that can be checked.`
+	systemPrompt := prompts.Prompts.CondenseSystem
+	userPrompt := prompts.Replace(prompts.Prompts.CondenseUser, map[string]string{
+		"ANALYSES": strings.Join(analysisTexts, "\n\n"),
+		"CAPTION":  caption,
+	})
 
-	prompt := fmt.Sprintf(`Given the following analyses of social media content, condense them into key verifiable claims.
-
-Analyses:
-%s
-
-Original Caption: %s
-
-Extract and return as JSON:
-{
-  "mainClaims": ["primary claim 1", "primary claim 2"],
-  "keyFacts": ["fact that can be verified"],
-  "overallMessage": "the main message being conveyed",
-  "redFlags": ["any potential misinformation indicators"]
-}`, strings.Join(analysisTexts, "\n\n"), caption)
-
-	response, err := a.provider.ChatWithSystem(systemPrompt, prompt)
+	response, err := a.provider.ChatWithSystem(systemPrompt, userPrompt)
 	if err != nil {
 		return CondensedInfo{}, fmt.Errorf("failed to condense information: %w", err)
 	}
@@ -179,55 +143,15 @@ Extract and return as JSON:
 
 // EvaluateTruthfulness performs the main fact-checking
 func (a *AIService) EvaluateTruthfulness(info CondensedInfo) (TruthEvaluation, error) {
-	systemPrompt := `You are an expert fact-checker. Evaluate claims objectively based on known facts, reputable sources, and logical analysis. Always cite your reasoning and acknowledge uncertainty when appropriate.`
+	systemPrompt := prompts.Prompts.EvaluateSystem
+	userPrompt := prompts.Replace(prompts.Prompts.EvaluateUser, map[string]string{
+		"MAIN_CLAIMS":     strings.Join(info.MainClaims, "; "),
+		"KEY_FACTS":       strings.Join(info.KeyFacts, "; "),
+		"OVERALL_MESSAGE": info.OverallMessage,
+		"RED_FLAGS":       strings.Join(info.RedFlags, "; "),
+	})
 
-	prompt := fmt.Sprintf(`Perform a comprehensive fact-check on the following claims from social media content.
-
-Main Claims: %s
-
-Key Facts Presented: %s
-
-Overall Message: %s
-
-Red Flags Identified: %s
-
-Please analyze and provide:
-1. VERIFICATION STATUS for each claim (verified, false, misleading, partially_true, unverifiable, satire, no_claim)
-2. SUPPORTING EVIDENCE: Known facts that support the claims
-3. CONTRADICTING EVIDENCE: Known facts that contradict the claims
-4. SOURCES: Mention reputable news organizations, fact-checkers, or official sources
-5. MISSING CONTEXT: Important information that changes the meaning
-6. OVERALL VERDICT: Your assessment
-
-Return as JSON:
-{
-  "verdict": "verified|false|misleading|partially_true|unverifiable|satire|no_claim",
-  "confidence": 0.0-1.0,
-  "summary": "overall summary explaining the verdict",
-  "claims": [
-    {
-      "statement": "the claim",
-      "verdict": "verdict for this claim",
-      "explanation": "detailed explanation why",
-      "proArguments": ["supporting points"],
-      "contraArguments": ["contradicting points"]
-    }
-  ],
-  "sources": [
-    {
-      "name": "source name (e.g., Reuters, AP News, Snopes)",
-      "description": "what they reported or would report",
-      "stance": "supports|contradicts|neutral|context",
-      "credibility": "high|medium|low"
-    }
-  ]
-}`,
-		strings.Join(info.MainClaims, "; "),
-		strings.Join(info.KeyFacts, "; "),
-		info.OverallMessage,
-		strings.Join(info.RedFlags, "; "))
-
-	response, err := a.provider.ChatWithSystem(systemPrompt, prompt)
+	response, err := a.provider.ChatWithSystem(systemPrompt, userPrompt)
 	if err != nil {
 		return TruthEvaluation{}, fmt.Errorf("failed to evaluate truthfulness: %w", err)
 	}

@@ -1,0 +1,13 @@
+I need you to analyze a social media post. 
+The post contains an image at this URL: {{IMAGE_URL}}
+Caption/context: {{CONTEXT}}
+
+Since you cannot see the image directly, analyze the caption and URL for any claims that can be fact-checked.
+Return your analysis as JSON:
+{
+  "description": "analysis of available text content",
+  "textFound": "",
+  "elements": [],
+  "context": "context from caption",
+  "claims": ["claims found in caption"]
+}

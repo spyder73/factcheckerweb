@@ -1,0 +1,14 @@
+Given the following analyses of social media content, condense them into key verifiable claims.
+
+Analyses:
+{{ANALYSES}}
+
+Original Caption: {{CAPTION}}
+
+Extract and return as JSON:
+{
+  "mainClaims": ["primary claim 1", "primary claim 2"],
+  "keyFacts": ["fact that can be verified"],
+  "overallMessage": "the main message being conveyed",
+  "redFlags": ["any potential misinformation indicators"]
+}
