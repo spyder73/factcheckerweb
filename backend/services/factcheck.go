@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -103,77 +105,189 @@ func (f *FactCheckService) updateProgress(id string, step string, progress int, 
 	}
 }
 
+// mediaAnalysisResult holds the result of analyzing a single media item
+type mediaAnalysisResult struct {
+	index    int
+	analysis ImageAnalysis
+	info     models.MediaInfo
+	err      error
+}
+
+// analyzeMediaParallel processes multiple media items concurrently
+func (f *FactCheckService) analyzeMediaParallel(id string, mediaURLs []string, caption string) ([]ImageAnalysis, []models.MediaInfo, error) {
+	if len(mediaURLs) == 0 {
+		return nil, nil, nil
+	}
+
+	log.Printf("[Fact Checker] Starting parallel analysis of %d media items", len(mediaURLs))
+	startTime := time.Now()
+
+	// Create channels for results and progress
+	resultChan := make(chan mediaAnalysisResult, len(mediaURLs))
+	var wg sync.WaitGroup
+
+	// Launch goroutine for each media item
+	for i, mediaURL := range mediaURLs {
+		wg.Add(1)
+		go func(index int, url string) {
+			defer wg.Done()
+
+			log.Printf("[Fact Checker] Analyzing media %d/%d (goroutine %d)", index+1, len(mediaURLs), index)
+
+			// Perform analysis
+			analysis, err := f.ai.AnalyzeImage(url, caption)
+
+			result := mediaAnalysisResult{
+				index: index,
+				err:   err,
+			}
+
+			if err == nil {
+				result.analysis = analysis
+				result.info = models.MediaInfo{
+					ID:          uuid.New().String(),
+					Type:        "image",
+					URL:         url,
+					Description: analysis.Description,
+					Elements:    analysis.Elements,
+					TextFound:   analysis.TextFound,
+				}
+				log.Printf("[Fact Checker] Completed analysis of media %d/%d", index+1, len(mediaURLs))
+			} else {
+				log.Printf("[Fact Checker] Failed to analyze media %d/%d: %v", index+1, len(mediaURLs), err)
+			}
+
+			resultChan <- result
+
+			// Update progress (approximate)
+			progressIncrement := 25 / len(mediaURLs)
+			currentProgress := 25 + ((index + 1) * progressIncrement)
+			f.updateProgress(id, "analyzing_media", currentProgress,
+				fmt.Sprintf("Analyzed %d/%d images", index+1, len(mediaURLs)))
+		}(i, mediaURL)
+	}
+
+	// Wait for all analyses to complete
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results in order
+	results := make([]mediaAnalysisResult, len(mediaURLs))
+	successCount := 0
+	errorCount := 0
+
+	for result := range resultChan {
+		results[result.index] = result
+		if result.err == nil {
+			successCount++
+		} else {
+			errorCount++
+		}
+	}
+
+	log.Printf("[Fact Checker] Parallel analysis completed in %v - Success: %d, Errors: %d",
+		time.Since(startTime), successCount, errorCount)
+
+	// Extract successful analyses in original order
+	var mediaAnalyses []ImageAnalysis
+	var mediaInfos []models.MediaInfo
+
+	for _, result := range results {
+		if result.err == nil {
+			mediaAnalyses = append(mediaAnalyses, result.analysis)
+			mediaInfos = append(mediaInfos, result.info)
+		}
+	}
+
+	// Return error only if ALL analyses failed
+	if len(mediaAnalyses) == 0 && len(mediaURLs) > 0 {
+		return nil, nil, fmt.Errorf("all media analyses failed")
+	}
+
+	return mediaAnalyses, mediaInfos, nil
+}
+
 func (f *FactCheckService) processCheck(id string, req models.CheckRequest) {
 	startTime := time.Now()
 	ctx := context.Background()
 	_ = ctx // For future cancellation support
+
+	log.Printf("[Fact Checker] Starting fact-check %s for URL: %s", id, req.URL)
 
 	// Step 1: Scrape content
 	f.updateProgress(id, "scraping", 10, "Fetching content from URL...")
 
 	content, err := f.scraper.ScrapePost(req.URL)
 	if err != nil {
+		log.Printf("[Fact Checker] Scraping failed for %s: %v", id, err)
 		f.setError(id, "Failed to fetch content: "+err.Error())
 		return
 	}
 
+	log.Printf("[Fact Checker] Scraped content for %s - Platform: %s, Media items: %d, Caption length: %d",
+		id, content.Platform, len(content.MediaURLs), len(content.Caption))
+
 	// Add manual caption if provided
 	if req.Caption != "" && content.Caption == "" {
 		content.Caption = req.Caption
+		log.Printf("[Fact Checker] Using manual caption for %s", id)
 	}
 
-	// Step 2: Analyze media
-	f.updateProgress(id, "analyzing_media", 25, "Analyzing images and media...")
+	// Step 2: Analyze media (PARALLEL)
+	f.updateProgress(id, "analyzing_media", 25, "Analyzing images in parallel...")
 
-	var mediaAnalyses []ImageAnalysis
-	var mediaInfos []models.MediaInfo
-
-	for i, mediaURL := range content.MediaURLs {
-		f.updateProgress(id, "analyzing_media", 25+((i+1)*10),
-			"Analyzing media "+(string(rune('1'+i)))+"...")
-
-		analysis, err := f.ai.AnalyzeImage(mediaURL, content.Caption)
-		if err != nil {
-			// Continue with other media on error
-			continue
-		}
-
-		mediaAnalyses = append(mediaAnalyses, analysis)
-		mediaInfos = append(mediaInfos, models.MediaInfo{
-			ID:          uuid.New().String(),
-			Type:        "image",
-			URL:         mediaURL,
-			Description: analysis.Description,
-			Elements:    analysis.Elements,
-			TextFound:   analysis.TextFound,
-		})
+	mediaAnalyses, mediaInfos, err := f.analyzeMediaParallel(id, content.MediaURLs, content.Caption)
+	if err != nil {
+		log.Printf("[Fact Checker] Media analysis failed for %s: %v", id, err)
+		f.setError(id, "Failed to analyze media: "+err.Error())
+		return
 	}
 
-	// If no media, analyze caption directly
+	// If no media was analyzed successfully, try to work with caption only
 	if len(mediaAnalyses) == 0 && content.Caption != "" {
+		log.Printf("[Fact Checker] No media analyzed for %s, using caption only", id)
 		mediaAnalyses = append(mediaAnalyses, ImageAnalysis{
 			Description: content.Caption,
 			Claims:      []string{content.Caption},
 		})
 	}
 
+	// If still no content, fail
+	if len(mediaAnalyses) == 0 {
+		log.Printf("[Fact Checker] No content to analyze for %s", id)
+		f.setError(id, "No analyzable content found")
+		return
+	}
+
+	log.Printf("[Fact Checker] Completed media analysis for %s - Analyzed %d items", id, len(mediaAnalyses))
+
 	// Step 3: Condense information
 	f.updateProgress(id, "condensing", 50, "Extracting key claims...")
 
 	condensed, err := f.ai.CondenseInformation(mediaAnalyses, content.Caption)
 	if err != nil {
+		log.Printf("[Fact Checker] Information condensing failed for %s: %v", id, err)
 		f.setError(id, "Failed to analyze content: "+err.Error())
 		return
 	}
+
+	log.Printf("[Fact Checker] Condensed information for %s - Claims: %d, Red flags: %d",
+		id, len(condensed.MainClaims), len(condensed.RedFlags))
 
 	// Step 4: Evaluate truthfulness
 	f.updateProgress(id, "evaluating", 70, "Verifying claims against sources...")
 
 	evaluation, err := f.ai.EvaluateTruthfulness(condensed)
 	if err != nil {
+		log.Printf("[Fact Checker] Truthfulness evaluation failed for %s: %v", id, err)
 		f.setError(id, "Failed to evaluate claims: "+err.Error())
 		return
 	}
+
+	log.Printf("[Fact Checker] Evaluation complete for %s - Verdict: %s, Confidence: %.2f, Claims: %d, Sources: %d",
+		id, evaluation.Verdict, evaluation.Confidence, len(evaluation.Claims), len(evaluation.Sources))
 
 	// Step 5: Build result
 	f.updateProgress(id, "finalizing", 90, "Compiling results...")
@@ -190,6 +304,8 @@ func (f *FactCheckService) processCheck(id string, req models.CheckRequest) {
 		check.ProcessingTime = time.Since(startTime).Seconds()
 	}
 	f.mu.Unlock()
+
+	log.Printf("[Fact Checker] Fact-check %s completed in %.2fs", id, time.Since(startTime).Seconds())
 
 	f.updateProgress(id, "complete", 100, "Fact-check complete!")
 }
