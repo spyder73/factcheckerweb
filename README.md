@@ -1,5 +1,7 @@
 # FactChecker 🔍
 
+This is just a test project currently!
+
 A web application that fact-checks social media posts using AI. Paste any social media link and get an AI-powered analysis of its truthfulness.
 
 ![Dark Theme](https://img.shields.io/badge/theme-dark-000000) ![Go](https://img.shields.io/badge/Go-1.21+-00ADD8) ![React](https://img.shields.io/badge/React-18-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
@@ -7,7 +9,7 @@ A web application that fact-checks social media posts using AI. Paste any social
 ## Features
 
 - 🔗 **Paste any social media link** - Supports Instagram, Twitter/X, TikTok, Facebook, YouTube
-- 🤖 **AI-powered analysis** - Uses Duck.ai for content analysis
+- 🤖 **AI-powered analysis** - Uses Mistral for content analysis
 - 📊 **Real-time progress** - Watch the fact-checking process live
 - ✅ **Verdict system** - Verified, False, Misleading, Partially True, Unverifiable, Satire
 - 📝 **Claims breakdown** - Individual analysis of each claim
