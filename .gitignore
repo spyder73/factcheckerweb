@@ -59,3 +59,4 @@ logs
 *.log
 
 instagram-service/venv
+instagram-service/__pycache__
