@@ -64,6 +64,9 @@ func NewProvider(config Config) (Provider, error) {
 		if config.APIKey == "" {
 			return nil, fmt.Errorf("OPENROUTER_API_KEY not set")
 		}
+		if config.Model == "" {
+			config.Model = os.Getenv("OPENROUTER_MODEL")
+		}
 		return openrouter.NewProvider(config), nil
 
 	default:
