@@ -109,9 +109,17 @@ func (p *Pipeline) Run(parentCtx context.Context, checkID uuid.UUID, in CheckInp
 		content.Caption = in.Caption
 	}
 
+	// --- media analysis (optional) ---
+	var mediaAnalyses []MediaAnalysis
+	if len(content.MediaURLs) > 0 && keys.Judge().SupportsVision() {
+		emit("media", 12, fmt.Sprintf("analyzing %d image(s)", min(len(content.MediaURLs), 6)),
+			map[string]any{"count": min(len(content.MediaURLs), 6)})
+		mediaAnalyses = runMediaAnalysis(ctx, keys.Judge(), content.MediaURLs, 6)
+	}
+
 	// --- claim extraction ---
 	emit("extract", 20, "extracting atomic claims", nil)
-	claims, err := p.extractClaims(ctx, content, keys.Screener())
+	claims, err := p.extractClaims(ctx, content, mediaAnalyses, keys.Screener())
 	if err != nil {
 		p.fail(ctx, checkID, ch, err)
 		return
@@ -207,6 +215,26 @@ func totalCostFromDB(ctx context.Context, db *pgxpool.Pool, checkID uuid.UUID) (
 	return
 }
 
+// safeMetaField defangs newlines + caps length so a scraper-injected
+// "author" or "url" can't reshape the prompt.
+func safeMetaField(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	if len(s) > 500 {
+		s = s[:500] + "…"
+	}
+	return s
+}
+
+// min returns the smaller of two ints. Stdlib `min` requires Go 1.21+ generics
+// but is available — wrap so we keep the call sites readable.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // sanitizeStage strips any \r, \n, or NUL that would break SSE framing.
 // Pipeline-internal callers pass constants, but the value flows verbatim
 // into the `event: %s` SSE line — a defensive pass is cheap.
@@ -241,15 +269,25 @@ Rules:
 - Maximum 6 claims. If there's nothing checkable, return {"claims": []}.
 - Use the third person — strip "I think", "they say", etc.`
 
-// extractClaims runs the cheap-model condense pass.
-func (p *Pipeline) extractClaims(ctx context.Context, content *models.ContentInfo, prov ai.Provider) ([]Claim, error) {
+// extractClaims runs the cheap-model condense pass. Takes the scraped caption
+// plus optional textual media analyses (NEVER the raw image data — those are
+// base64 strings that explode the prompt past any context window).
+func (p *Pipeline) extractClaims(ctx context.Context, content *models.ContentInfo, mediaAnalyses []MediaAnalysis, prov ai.Provider) ([]Claim, error) {
 	var sb strings.Builder
-	sb.WriteString("POST CAPTION:\n")
-	sb.WriteString(promptsafe.Wrap(content.Caption, promptsafe.WrapOptions{Label: "caption"}))
-	if len(content.MediaURLs) > 0 {
-		sb.WriteString("\n\nMEDIA URLS (image analysis NOT performed in this pass):\n")
-		for _, u := range content.MediaURLs {
-			sb.WriteString(" - " + u + "\n")
+	sb.WriteString("POST METADATA:\n")
+	fmt.Fprintf(&sb, "  platform: %s\n  author: %s\n  url: %s\n",
+		safeMetaField(content.Platform), safeMetaField(content.Author), safeMetaField(content.URL))
+	sb.WriteString("\nPOST CAPTION:\n")
+	sb.WriteString(promptsafe.Wrap(content.Caption, promptsafe.WrapOptions{Label: "caption", MaxBytes: 8192}))
+	if n := len(mediaAnalyses); n > 0 {
+		fmt.Fprintf(&sb, "\n\nIMAGE ANALYSES (%d image(s)):\n", n)
+		for _, m := range mediaAnalyses {
+			if m.Errored {
+				fmt.Fprintf(&sb, "  - %s: [ERROR] %s\n", m.Source, m.Text)
+				continue
+			}
+			fmt.Fprintf(&sb, "  - %s: %s\n", m.Source,
+				promptsafe.Wrap(m.Text, promptsafe.WrapOptions{Label: m.Source, MaxBytes: 2048}))
 		}
 	}
 	body, _, err := prov.CompleteJSON(ctx, extractSystem, sb.String(), ai.CompleteOpts{
