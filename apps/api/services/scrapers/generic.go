@@ -1,26 +1,25 @@
 package scrapers
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
+	"alethea/api/httpx"
 	"alethea/api/models"
 )
 
-// GenericScraper handles generic web scraping via meta tags
-type GenericScraper struct {
-	client *http.Client
-}
+// GenericScraper handles generic web scraping via meta tags. All fetches go
+// through httpx.SafeFetch — the user supplies the URL, so we MUST treat it
+// as hostile (block 169.254.169.254, RFC1918, link-local, etc.).
+type GenericScraper struct{}
 
 // NewGenericScraper creates a new generic scraper
 func NewGenericScraper() *GenericScraper {
-	return &GenericScraper{
-		client: &http.Client{},
-	}
+	return &GenericScraper{}
 }
 
 func (s *GenericScraper) Platform() string {
@@ -31,7 +30,7 @@ func (s *GenericScraper) CanHandle(url string) bool {
 	return true // Fallback handler
 }
 
-func (s *GenericScraper) Scrape(postURL string) (*models.ContentInfo, error) {
+func (s *GenericScraper) Scrape(ctx context.Context, postURL string) (*models.ContentInfo, error) {
 	parsedURL, err := url.Parse(postURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
@@ -45,22 +44,21 @@ func (s *GenericScraper) Scrape(postURL string) (*models.ContentInfo, error) {
 		MediaURLs: []string{},
 	}
 
-	req, err := http.NewRequest("GET", postURL, nil)
-	if err != nil {
-		return content, nil
+	// Honor caller-provided deadline; only impose our own if the caller didn't.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
 	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
-
-	resp, err := s.client.Do(req)
+	body, _, err := httpx.SafeFetch(ctx, postURL, httpx.SafeFetchOptions{
+		Timeout:      15 * time.Second,
+		MaxBodyBytes: 5 << 20, // 5 MiB cap on the HTML page
+		MaxRedirects: 3,
+		UserAgent:    "Mozilla/5.0 (Alethea fact-check bot; +https://alethea.app)",
+	})
 	if err != nil {
-		return content, nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return content, nil
+		// Surface the error so the orchestrator can fail-fast on disallowed URLs.
+		return content, fmt.Errorf("scrape fetch: %w", err)
 	}
 
 	html := string(body)

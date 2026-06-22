@@ -1,6 +1,7 @@
 package mistral
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -32,12 +33,97 @@ func NewProvider(config types.Config) *Provider {
 	}
 }
 
-func (p *Provider) Name() string {
-	return "mistral"
+func (p *Provider) Name() string    { return "mistral" }
+func (p *Provider) ModelID() string  { return p.model }
+func (p *Provider) SupportsVision() bool { return true }
+
+// ChatWithSystemCtx is the context-aware completion path. Phase 2 callers
+// use this so cancellations propagate.
+func (p *Provider) ChatWithSystemCtx(ctx context.Context, systemPrompt, message string, opts types.CompleteOpts) (string, types.Usage, error) {
+	model := opts.Model
+	if model == "" {
+		model = p.model
+	}
+	temp := opts.Temperature
+	if temp == 0 {
+		temp = p.temperature
+	}
+	maxTok := opts.MaxTokens
+	if maxTok == 0 {
+		maxTok = 4096
+	}
+
+	messages := []Message{}
+	if systemPrompt != "" {
+		messages = append(messages, Message{Role: "system", Content: systemPrompt})
+	}
+	messages = append(messages, Message{Role: "user", Content: message})
+
+	req := Request{Model: model, Messages: messages, Temperature: temp, MaxTokens: maxTok}
+	resp, err := p.client.SendRequestCtx(ctx, req)
+	if err != nil {
+		return "", types.Usage{}, err
+	}
+	if len(resp.Choices) == 0 {
+		return "", types.Usage{}, fmt.Errorf("mistral: no choices in response")
+	}
+	usage := types.Usage{
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		CostMicros:   estimateCostMicros(model, resp.Usage.PromptTokens, resp.Usage.CompletionTokens),
+	}
+	return resp.Choices[0].Message.Content, usage, nil
 }
 
-func (p *Provider) SupportsVision() bool {
-	return true
+// CompleteJSON asks Mistral to return a JSON object. Mistral supports
+// "response_format": {"type": "json_object"} on chat completions; we don't
+// have that wired through the Request type yet so for Phase 2 we rely on
+// the system prompt instructing the model to return JSON.
+func (p *Provider) CompleteJSON(ctx context.Context, systemPrompt, userPrompt string, opts types.CompleteOpts) ([]byte, types.Usage, error) {
+	// Belt-and-suspenders: append a reminder to the system prompt.
+	sys := systemPrompt + "\n\nRESPONSE FORMAT: respond with a single JSON object only — no prose, no markdown fences."
+	body, usage, err := p.ChatWithSystemCtx(ctx, sys, userPrompt, opts)
+	if err != nil {
+		return nil, usage, err
+	}
+	cleaned := stripCodeFence(strings.TrimSpace(body))
+	return []byte(cleaned), usage, nil
+}
+
+// stripCodeFence removes leading/trailing ```...``` markers if the model
+// still produced them (defensive — system prompt forbids it).
+func stripCodeFence(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		// Strip the language tag if any: ```json\n...\n```
+		if i := strings.IndexByte(s, '\n'); i > 0 {
+			s = s[i+1:]
+		}
+		s = strings.TrimSuffix(s, "```")
+	}
+	return strings.TrimSpace(s)
+}
+
+// estimateCostMicros is a rough-but-stable cost approximation for Mistral.
+// Prices in microcents (1 microcent = 1e-6 USD) per 1M tokens, as of 2025-Q2.
+// Update when pricing changes. We multiply tokens × micros_per_million / 1_000_000
+// and integer-truncate, accepting <$0.000001 rounding loss.
+func estimateCostMicros(model string, in, out int) int {
+	// (in_per_mil_microcents, out_per_mil_microcents)
+	var inMicrosPerMil, outMicrosPerMil int64
+	switch {
+	case strings.Contains(model, "large") || strings.Contains(model, "pixtral"):
+		inMicrosPerMil = 2_000_000  // $2/M = 200M microcents/M
+		outMicrosPerMil = 6_000_000
+	case strings.Contains(model, "small"):
+		inMicrosPerMil = 200_000
+		outMicrosPerMil = 600_000
+	default:
+		inMicrosPerMil = 1_000_000
+		outMicrosPerMil = 3_000_000
+	}
+	cost := (int64(in)*inMicrosPerMil + int64(out)*outMicrosPerMil) / 1_000_000
+	return int(cost)
 }
 
 func (p *Provider) Chat(message string) (string, error) {

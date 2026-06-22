@@ -12,6 +12,7 @@ import (
 
 	"alethea/api/audit"
 	"alethea/api/auth"
+	"alethea/api/byok"
 	"alethea/api/config"
 	"alethea/api/db"
 	"alethea/api/handlers"
@@ -19,6 +20,12 @@ import (
 	alog "alethea/api/log"
 	"alethea/api/ratelimit"
 	"alethea/api/services"
+	"alethea/api/services/ai"
+	"alethea/api/services/byokresolver"
+	"alethea/api/services/factcheck"
+	"alethea/api/services/factcheck/cache"
+	"alethea/api/services/factcheck/checkstream"
+	"alethea/api/services/search"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -28,15 +35,11 @@ import (
 )
 
 func main() {
-	// godotenv.Load is best-effort for the file-missing case (we read live
-	// env in prod), but parse errors on a present .env are unambiguous bugs.
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
-		// slog isn't initialized yet — use stdlib briefly.
 		log.Printf("dotenv parse error: %v", err)
 		os.Exit(1)
 	}
 
-	// Logging first so anything else logs through our redactor.
 	alog.Init(os.Getenv("DEBUG") == "true")
 
 	if err := config.Load(); err != nil {
@@ -45,15 +48,13 @@ func main() {
 	}
 	cfg := config.App
 
-	// Trusted-proxy registry MUST be set before any handler runs ClientIP.
-	// Empty list = never honor X-Forwarded-For (correct default for direct exposure).
 	prefixes, err := httpx.ParseProxyCIDRs(cfg.TrustedProxies)
 	if err != nil {
 		slog.Warn("TRUSTED_PROXIES contained bad entries — those entries ignored", "err", err)
 	}
 	httpx.SetTrustedProxies(prefixes)
 	if len(prefixes) == 0 {
-		slog.Info("TRUSTED_PROXIES is empty — X-Forwarded-For will be ignored (use r.RemoteAddr)")
+		slog.Info("TRUSTED_PROXIES is empty — X-Forwarded-For will be ignored")
 	} else {
 		slog.Info("trusted proxies configured", "count", len(prefixes))
 	}
@@ -88,16 +89,59 @@ func main() {
 	}
 	slog.Info("redis ready")
 
-	// AI + scraping (existing services).
-	aiService, err := services.NewAIService()
+	// AI providers — pooled. Strong = Mistral large (judge + investigators);
+	// Screener also Mistral but on whatever the env default is.
+	strongProv, err := ai.NewDefaultProvider()
 	if err != nil {
-		slog.Error("AI service init failed — set MISTRAL_API_KEY (or another provider key) in .env", "err", err)
+		slog.Error("AI provider init failed — set MISTRAL_API_KEY (or another provider key) in .env", "err", err)
 		os.Exit(1)
 	}
-	slog.Info("ai provider ready", "provider", aiService.ProviderName())
-	scraper := services.NewScraperService()
-	factChecker := services.NewFactCheckService(aiService, scraper)
-	h := handlers.NewHandler(factChecker)
+	slog.Info("ai provider ready", "provider", strongProv.Name(), "model", strongProv.ModelID())
+
+	// Legacy services still used for: scraper + image analysis through the
+	// existing aiservice wrapper. Pipeline calls the scraper directly.
+	scraperSvc := services.NewScraperService()
+
+	// BYOK vault. Missing master key is non-fatal — BYOK endpoints will 503
+	// with a clear message; the pipeline runs pool-only.
+	var vault *byok.Vault
+	if cfg.BYOKMasterKey != "" {
+		vault, err = byok.New(cfg.BYOKMasterKey)
+		if err != nil {
+			slog.Error("BYOK init failed — fix BYOK_MASTER_KEY or unset it", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("BYOK vault ready")
+	} else {
+		slog.Warn("BYOK disabled — BYOK_MASTER_KEY not set (BYOK endpoints will 503)")
+	}
+
+	// Search providers. Brave primary, Tavily fallback. Empty key ⇒ provider absent.
+	var searchProviders []search.Provider
+	if k := os.Getenv("BRAVE_SEARCH_API_KEY"); k != "" {
+		searchProviders = append(searchProviders, search.NewBrave(k))
+	}
+	if k := os.Getenv("TAVILY_API_KEY"); k != "" {
+		searchProviders = append(searchProviders, search.NewTavily(k))
+	}
+	if len(searchProviders) == 0 {
+		slog.Warn("no search provider configured — pipeline will return unverifiable verdicts. Set BRAVE_SEARCH_API_KEY or TAVILY_API_KEY.")
+	}
+	sx := search.NewMulti(rdb, 10*time.Minute, searchProviders...)
+
+	// Pipeline.
+	resolver := byokresolver.New(byokresolver.Pool{Screener: strongProv, Strong: strongProv}, vault, pool)
+	verdictCache := cache.New(rdb, factcheck.PromptVersion)
+	hub := checkstream.NewHub()
+	pipeline := factcheck.NewPipeline(factcheck.Deps{
+		DB: pool, Resolver: resolver, Search: sx, Cache: verdictCache, Hub: hub, Scraper: scraperSvc,
+	})
+	checkH := handlers.NewCheckV2(pool, pipeline, hub)
+	byokH := handlers.NewBYOKKeys(pool, vault)
+
+	// Legacy single-shot handler kept ONLY for /health; the /api/check
+	// endpoints are now backed by the new pipeline.
+	legacyH := handlers.NewHandler(nil)
 
 	// Auth
 	captcha := auth.NewCaptcha(cfg.HCaptchaSecret)
@@ -109,15 +153,9 @@ func main() {
 
 	// Router
 	r := chi.NewRouter()
-
 	r.Use(middleware.RequestID)
-	// NOTE: chi's middleware.RealIP unconditionally trusts X-Forwarded-For,
-	// which is the same spoof vector we just hardened against. Do NOT add
-	// it — httpx.ClientIP handles the trusted-proxies check correctly.
 	r.Use(slogRequestLogger())
 	r.Use(middleware.Recoverer)
-	// NO middleware.Timeout — it would kill /api/check/{id}/stream (SSE).
-	// Per-route timeouts can be added on individual non-streaming endpoints later.
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "DELETE", "OPTIONS"},
@@ -126,17 +164,14 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
-
-	// Every route gets the optional session attached.
 	r.Use(auth.Optional(pool))
-	// CSRF middleware enforces double-submit on mutating, authenticated requests.
 	r.Use(auth.CSRF())
 
-	// Public — no rate limit (cheap).
-	r.Get("/health", h.HealthCheck)
+	// Public
+	r.Get("/health", legacyH.HealthCheck)
 	r.Get("/version", versionHandler)
 
-	// Auth endpoints — rate-limited per IP.
+	// Auth
 	r.With(limiter.Middleware("/auth/signup")).Post("/auth/signup", authSvc.Signup)
 	r.With(limiter.Middleware("/auth/login")).Post("/auth/login", authSvc.Login)
 	r.With(limiter.Middleware("/auth/forgot")).Post("/auth/forgot", authSvc.Forgot)
@@ -145,27 +180,29 @@ func main() {
 	r.With(limiter.Middleware("/auth/logout")).Post("/auth/logout", authSvc.Logout)
 	r.Get("/auth/me", authSvc.Me)
 
-	// Fact-check — rate-limited per (plan, scope).
+	// Fact-check v2 (pipeline-backed)
 	r.With(limiter.Middleware("/api/check")).Post("/api/check", func(w http.ResponseWriter, req *http.Request) {
-		// Audit who initiated the check (anon checks log with NULL user).
 		var uid *int64
 		if sess, ok := auth.FromContext(req.Context()); ok {
 			uid = &sess.UserID
 		}
 		audit.Log(req.Context(), pool, uid, "check.started", "check", "", req, nil)
-		h.CheckFacts(w, req)
+		checkH.Start(w, req)
 	})
-	r.Get("/api/check/{id}", h.GetCheckStatus)
-	r.Get("/api/check/{id}/stream", h.StreamCheckProgress)
+	r.With(limiter.Middleware("/api/check/get")).Get("/api/check/{id}", checkH.Get)
+	r.With(limiter.Middleware("/api/check/stream")).Get("/api/check/{id}/stream", checkH.Stream)
+
+	// BYOK key management (signed-in only, rate-limited per user)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Get("/api/me/keys", byokH.List)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Post("/api/me/keys", byokH.Set)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Delete("/api/me/keys", byokH.Delete)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           r,
-		ReadHeaderTimeout: 10 * time.Second, // slowloris on headers
-		ReadTimeout:       30 * time.Second, // slowloris on body — auth bodies are small
-		// WriteTimeout intentionally 0 — /api/check/{id}/stream is long-lived SSE.
-		// IdleTimeout guards keepalive connections.
-		IdleTimeout: 120 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
@@ -185,11 +222,9 @@ func main() {
 
 func versionHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"name":"alethea-api","phase":"1"}`))
+	_, _ = w.Write([]byte(`{"name":"alethea-api","phase":"2"}`))
 }
 
-// slogRequestLogger is a tiny replacement for chi's middleware.Logger so we
-// can emit structured access logs through slog instead of stdlib log.
 func slogRequestLogger() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package mistral
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,12 +34,18 @@ func NewClient(apiKey, baseURL string) *Client {
 
 // SendRequest sends a chat completion request to Mistral
 func (c *Client) SendRequest(req Request) (*Response, error) {
+	return c.SendRequestCtx(context.Background(), req)
+}
+
+// SendRequestCtx is the context-aware variant. Phase 2 callers must use this
+// so cancellations propagate to the in-flight HTTP request.
+func (c *Client) SendRequestCtx(ctx context.Context, req Request) (*Response, error) {
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("POST", c.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

@@ -2,6 +2,7 @@ package scrapers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -57,7 +58,7 @@ type InstagramServiceResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-func (s *InstagramScraper) Scrape(url string) (*models.ContentInfo, error) {
+func (s *InstagramScraper) Scrape(ctx context.Context, url string) (*models.ContentInfo, error) {
 	log.Printf("[Instagram Scraper] Starting scrape for URL: %s", url)
 	startTime := time.Now()
 
@@ -67,23 +68,26 @@ func (s *InstagramScraper) Scrape(url string) (*models.ContentInfo, error) {
 		MediaURLs: []string{},
 	}
 
-	// Build request
 	reqBody, _ := json.Marshal(map[string]string{"url": url})
 
 	log.Printf("[Instagram Scraper] Calling Instagram service at %s/fetch", s.serviceURL)
 
-	resp, err := s.client.Post(
-		s.serviceURL+"/fetch",
-		"application/json",
-		bytes.NewReader(reqBody),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.serviceURL+"/fetch", bytes.NewReader(reqBody))
+	if err != nil {
+		return content, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		log.Printf("[Instagram Scraper] Failed to contact service: %v", err)
 		return content, fmt.Errorf("failed to contact Instagram service: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// Cap body size to prevent a hostile/buggy scraper from streaming GiB.
+	limited := io.LimitReader(resp.Body, 64<<20) // 64 MiB
+	body, err := io.ReadAll(limited)
 	if err != nil {
 		log.Printf("[Instagram Scraper] Failed to read response: %v", err)
 		return content, fmt.Errorf("failed to read response: %w", err)

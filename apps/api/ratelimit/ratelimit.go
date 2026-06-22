@@ -46,9 +46,24 @@ func Default() Limits {
 		"/api/check": {
 			"anon":  {Max: 3, Window: 24 * time.Hour},
 			"free":  {Max: 10, Window: 24 * time.Hour},
-			"byok":  {Max: 1000, Window: 24 * time.Hour}, // soft cap; their provider is real cap
+			"byok":  {Max: 1000, Window: 24 * time.Hour},
 			"plus":  {Max: 100, Window: 24 * time.Hour},
 			"admin": {Max: 10000, Window: 24 * time.Hour},
+		},
+		// GET / SSE on /api/check/{id}/* — cheap polls but unrestricted reads
+		// were a DoS vector (the UUID is the bearer; anyone with one could
+		// hold open unlimited SSE connections).
+		"/api/check/get": {
+			"anon": {Max: 120, Window: time.Minute},
+			"free": {Max: 240, Window: time.Minute},
+		},
+		"/api/check/stream": {
+			"anon": {Max: 30, Window: time.Minute},
+			"free": {Max: 60, Window: time.Minute},
+		},
+		// BYOK key management — auth-required, but still rate-limited.
+		"/api/me/keys": {
+			"free": {Max: 30, Window: time.Minute},
 		},
 	}
 }

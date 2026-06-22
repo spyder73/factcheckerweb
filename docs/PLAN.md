@@ -228,18 +228,48 @@ Each phase has a clear "done" condition.
 - 2FA TOTP enrolment flow (DB columns already exist)
 - Should land before Phase 6 mobile work begins.
 
-### Phase 2 — Pipeline v2 (5-7 days)
+### Phase 2 — Pipeline v2 ✅
 
-- Refactor `factcheck.go` into `pipeline/` (extract → investigators → judge → intent)
-- Add OpenAI, Anthropic, OpenRouter providers behind the existing `Provider` interface
-- Add `search/` interface with Tavily + Brave implementations
-- Add `cache/` (redis) for claim-hash verdicts
-- BYOK execution path (decrypt → inject → execute → never persist key in memory longer than the request)
-- **Verdict transparency log:** content-hash every completed check (claim + agent transcripts + sources) so verdicts are non-repudiable.
-- **Dissent visualization:** investigators' votes shown as a bar chart, not just one confidence number.
-- **Steelman panel:** alongside the verdict, brief strongest-case-for-the-claim summary (labeled interpretation).
-- **Adversarial benchmark suite:** bundle ~100 known-misinformation + ~100 known-true + ~50 edge cases. Run on every model/pipeline change. Publish score as a public "Alethea correctness" dashboard.
-- **Done when:** N=3 investigators produce dissent metrics; cache hit serves a repeat claim in <100ms.
+Implemented as **SRIR-Hybrid** (Shared Retrieval + Independent Reasoning + screener question-fanout + graceful BYOK fallback) — see the design workflow output. Packages shipped:
+
+- `services/factcheck/` — orchestrator, screener, retrieval, investigator (3 stylistic roles), judge with skeptical floor + intent + steelman, content_hash (non-repudiation), canonicalize, highstakes regex
+- `services/factcheck/cache/` — Redis verdict cache (key = prompt_version|judge_model|claim_hash, TTL per verdict kind)
+- `services/factcheck/checkstream/` — SSE hub with ring buffer + replay-from-seq + 10-min post-completion hold
+- `services/factcheck/persist/` — DB CRUD for the new tables
+- `services/search/` — Provider interface + Brave + Tavily + Multi (fallback chain) + Redis per-query cache + MockProvider for tests
+- `services/ai/` — Provider interface extended with `CompleteJSON`, `ChatWithSystemCtx`, `ModelID`. Mistral fully implemented; OpenAI/Anthropic/OpenRouter STUB (Phase 2.5 to flesh out)
+- `services/ai/aimock/` — deterministic test mock
+- `services/byokresolver/` — picks user's BYOK key or pool, graceful fallback
+- `byok/` — AES-GCM vault with AAD binding (userID|provider), tested
+- `httpx/safefetch.go` — SSRF-guarded URL fetcher; rejects RFC1918/loopback/link-local/metadata/ULA; re-checks IP at connect (TOCTOU)
+- `promptsafe/` — `<<<UNTRUSTED-DATA>>>` delimiter wrapper + system boilerplate; defangs forged delimiters
+- `handlers/check_v2.go` — pipeline-backed `/api/check`, `/api/check/{id}`, `/api/check/{id}/stream`
+- `handlers/byok.go` — `/api/me/keys` GET/POST/DELETE
+- Migrations 00006-00009: checks, claims, agent_runs+verdicts+citations, byok_keys
+
+Decisions taken on the open questions:
+- Brave primary, Tavily fallback. No DDG (ToS-grey).
+- Graceful BYOK fallback with SSE `byok_fallback` event + audit log.
+- 3 investigator styles (empiricist/skeptic/historical-context), default at N=1 = empiricist.
+- Domain diversity relaxed to ≥2 with confidence cap of 0.55 when only 2 (rather than hard fail).
+- Anonymous checks are readable by UUID (122-bit entropy).
+- Per-tier daily $ ceiling: not enforced in v1 — operational tuning + alerting once we see real traffic.
+
+**Done when:** N=3 investigators produce a dissent vector in the API response; cache hit serves a repeat claim in <200ms (integration test asserts this). Integration tests in `services/factcheck/pipeline_integration_test.go` cover happy path, cache hit, skeptical-fallback, retrieval failure, BYOK roundtrip.
+
+### Phase 2.5 — Provider rollout + adversarial bench (post-launch)
+
+- Real OpenAI + Anthropic + OpenRouter providers (currently stubs)
+- Per-tier daily $ ceiling enforcement
+- Adversarial benchmark suite (~100 known-misinformation + ~100 known-true + ~50 edge cases). Score published as `/dashboard` for radical transparency.
+- **Deferred Phase 2 security findings** (filed by the multi-lens adversarial review, judged acceptable for now — fix before scale-up):
+  - Resolver.For does a synchronous DB read per check; under pool saturation it blocks pipeline start. Mitigation: cache user plan + BYOK presence in the session row.
+  - Plaintext BYOK key copy lives in `ai.Config` for the request lifetime — Go strings are immutable, can't truly zeroize. Mitigation: switch the provider config to a `[]byte` field that GC can wipe.
+  - Redis cache values are unauthenticated — a compromised Redis can inject arbitrary verdicts. Mitigation: HMAC the cache value with a server secret.
+  - Brave + Tavily HTTP clients are plain `http.Client` (no SSRF guard), but they only talk to two fixed public hosts. Acceptable.
+  - `unverifiable` TTL is 1h — caches transient search outages. Tune to 5min for v1.5.
+  - Concurrent `InsertCitation` for the same `agent_run_id` has no idempotency guarantee — duplicates would inflate counts. Need a `(agent_run_id, url)` unique index.
+  - NFKC canonicalization may collapse two semantically distinct claims (e.g. with vs. without superscript) to the same hash. Acceptable false-positive rate for cache; revisit if observed in practice.
 
 ### Phase 3 — Sources & Journalist program (3-5 days)
 

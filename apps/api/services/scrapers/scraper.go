@@ -1,15 +1,19 @@
 package scrapers
 
-import "alethea/api/models"
+import (
+	"context"
 
-// Scraper defines the interface for platform-specific scrapers
+	"alethea/api/models"
+)
+
+// Scraper is the interface for platform-specific scrapers.
+//
+// Phase 2: every implementation must honor the provided context — the
+// pipeline's per-check timeout cancels mid-scrape via ctx, otherwise a slow
+// upstream (e.g. Instagram service hung) holds a goroutine forever and
+// blocks fwg.Wait downstream.
 type Scraper interface {
-	// Platform returns the platform name
 	Platform() string
-
-	// CanHandle returns true if this scraper can handle the given URL
 	CanHandle(url string) bool
-
-	// Scrape fetches content from the URL
-	Scrape(url string) (*models.ContentInfo, error)
+	Scrape(ctx context.Context, url string) (*models.ContentInfo, error)
 }
