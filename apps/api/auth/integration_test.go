@@ -205,6 +205,7 @@ func TestIntegrationCSRFEnforcedOnMutating(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/signup", svc.Signup)
+	mux.HandleFunc("POST /auth/login", svc.Login)
 	mux.HandleFunc("POST /dummy", dummy)
 	handler := Optional(pool)(CSRF()(mux))
 	srv := httptest.NewServer(handler)
@@ -217,7 +218,6 @@ func TestIntegrationCSRFEnforcedOnMutating(t *testing.T) {
 	_ = postJSON(t, client, srv.URL+"/auth/signup", signupReq{
 		Email: "csrf@example.com", Password: "fineenoughpassword",
 	})
-	mux.HandleFunc("POST /auth/login", svc.Login)
 	resp := postJSON(t, client, srv.URL+"/auth/login", loginReq{
 		Email: "csrf@example.com", Password: "fineenoughpassword",
 	})
