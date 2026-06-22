@@ -3,9 +3,11 @@ package factcheck
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"alethea/api/services/search"
+	"alethea/api/services/sources"
 )
 
 // runRetrieval builds the shared SourcePool for one claim. We issue a
@@ -86,3 +88,52 @@ func DistinctDomainCount(pool []search.Hit) int {
 	}
 	return len(seen)
 }
+
+// rerankByTrust sorts a pool of search hits so curated (tier1/tier2)
+// sources surface first. Within a tier the original order is preserved
+// (stable sort).
+//
+// Returns the reranked slice + a tier-by-DOMAIN map. We key by domain (not
+// full URL) because citations from investigators are deep article URLs that
+// won't equal the search-hit URL; the trust signal lives at the domain
+// level anyway, and any citation under reuters.com is "tier1" regardless of
+// which specific Reuters article was cited.
+func rerankByTrust(ctx context.Context, reg *sources.Registry, pool []search.Hit) ([]search.Hit, map[string]string) {
+	tierByDomain := map[string]string{}
+	if reg == nil {
+		return pool, tierByDomain
+	}
+	out := make([]search.Hit, len(pool))
+	copy(out, pool)
+
+	tierFor := make([]int, len(out))
+	for i, h := range out {
+		tierFor[i] = 1 // 'unknown'
+		if s, ok := reg.Lookup(ctx, h.SourceDomain); ok {
+			tierFor[i] = sources.TierRank(s.TrustTier)
+			tierByDomain[h.SourceDomain] = s.TrustTier
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return tierFor[i] > tierFor[j]
+	})
+	return out, tierByDomain
+}
+
+// Reranker is the constructor visible to the pipeline so factcheck doesn't
+// import sources directly in pipeline.go's main flow path beyond this hook.
+type Reranker interface {
+	Rerank(ctx context.Context, pool []search.Hit) ([]search.Hit, map[string]string)
+}
+
+// SourceReranker wraps a sources.Registry as a Reranker.
+type SourceReranker struct {
+	Registry *sources.Registry
+}
+
+func (s SourceReranker) Rerank(ctx context.Context, pool []search.Hit) ([]search.Hit, map[string]string) {
+	return rerankByTrust(ctx, s.Registry, pool)
+}
+
+// Compile-time guarantee that the suppressed-import 'fmt' is still used.
+var _ = fmt.Sprintf

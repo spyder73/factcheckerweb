@@ -271,13 +271,30 @@ Decisions taken on the open questions:
   - Concurrent `InsertCitation` for the same `agent_run_id` has no idempotency guarantee — duplicates would inflate counts. Need a `(agent_run_id, url)` unique index.
   - NFKC canonicalization may collapse two semantically distinct claims (e.g. with vs. without superscript) to the same hash. Acceptable false-positive rate for cache; revisit if observed in practice.
 
-### Phase 3 — Sources & Journalist program (3-5 days)
+### Phase 3 — Sources & Journalist program ✅
 
-- Seed source DB with ~100 reputable outlets (Reuters, AP, BBC, Le Monde, Der Spiegel, Nature, peer-review aggregators, .gov, .edu)
-- Investigators prefer curated sources at retrieval + rerank
-- Journalist application form + admin queue + decision flow
-- "Vetted source" badge in result UI
-- **Done when:** admin approves an application, that journalist's outlet appears as a higher-tier source within a subsequent check.
+- Migrations 00010-00012: `sources`, `journalist_applications` (with `journalist_apps_one_pending_per_user` partial-unique index), and a seed of ~100 curated outlets (wire / newspaper / academic / .gov / fact-checkers across 15+ countries)
+- `services/sources/` — in-memory registry with 5-minute auto-refresh, lazy reload on staleness
+- `services/factcheck/retrieval.go` — `SourceReranker` brings tier1/tier2 hits to the top of the per-claim source pool; tier-by-domain map flows into `citations.trust_tier` for the "Vetted source" badge
+- `handlers/sources.go` — public `GET /api/sources` (filterable by `?category=`/`?tier=`); admin `POST/DELETE /api/admin/sources`
+- `handlers/journalist.go` — auth `POST/GET/DELETE /api/me/journalist-application`; admin `GET /api/admin/journalist-applications`, `POST /api/admin/journalist-applications/{id}/decide` (decide can optionally promote the outlet to a curated source; never downgrades an existing higher tier)
+- Rate limits added for all new endpoints
+
+Hardening (Phase 3 adversarial review — 1 HIGH + 4 MEDIUM addressed; the LOWs filed below):
+- HIGH: trust-tier lookup was keyed by full URL; cited URLs are deep article pages that never matched the search-hit root URL → "Vetted source" badge was effectively broken for every citation. Now keyed by domain.
+- MEDIUM: `AdminList ?status=` validated against the enum; bad values return 400 (was silently returning empty 200)
+- MEDIUM: `AdminDecide id` parsed as int64; bad input returns 400 (was 500 from Postgres SQLSTATE 22P02)
+- MEDIUM: `Sources.Add` ON CONFLICT now preserves existing `vetting_notes` when the caller doesn't send any (was unconditionally overwriting with empty string)
+- MEDIUM: AdminDecide promote path uses a CASE expression that never downgrades an existing higher tier
+- LOW: Withdraw audit log now records the withdrawn application id (was empty string)
+
+Deferred LOWs (Phase 3.5):
+- Source registry thundering-herd: multiple concurrent stale Lookups can each trigger a Reload. Mitigation: `singleflight.Group` around Reload.
+- `extractDomainFromURL` doesn't validate the extracted host. Edge case: URLs with `userinfo@` get the wrong domain.
+- Byline URLs stored without URL-format validation. Phase 3.5: regex/parse check + reject non-https.
+- Submitted `outletUrl` not re-validated at decision time (the admin sees what was submitted).
+
+**Done when:** admin approves an application, the promoted outlet appears in `/api/sources` and shows up with its trust tier in subsequent check citations.
 
 ### Phase 4 — Web redesign (4-6 days)
 

@@ -65,6 +65,11 @@ func Default() Limits {
 		"/api/me/keys": {
 			"free": {Max: 30, Window: time.Minute},
 		},
+		// Phase 3 surfaces.
+		"/api/sources":              {"anon": {Max: 60, Window: time.Minute}, "free": {Max: 120, Window: time.Minute}},
+		"/api/me/journalist":        {"free": {Max: 10, Window: time.Minute}},
+		"/api/admin/sources":        {"admin": {Max: 60, Window: time.Minute}},
+		"/api/admin/journalist":     {"admin": {Max: 60, Window: time.Minute}},
 	}
 }
 

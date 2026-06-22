@@ -26,6 +26,7 @@ import (
 	"alethea/api/services/factcheck/cache"
 	"alethea/api/services/factcheck/checkstream"
 	"alethea/api/services/search"
+	"alethea/api/services/sources"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -129,15 +130,26 @@ func main() {
 	}
 	sx := search.NewMulti(rdb, 10*time.Minute, searchProviders...)
 
+	// Curated source registry — loaded eagerly so the first check doesn't pay
+	// the load latency, and refreshed every 5 min thereafter.
+	sourceReg := sources.New(pool)
+	if err := sourceReg.Reload(rootCtx); err != nil {
+		slog.Warn("source registry initial load failed; will retry lazily", "err", err)
+	}
+
 	// Pipeline.
 	resolver := byokresolver.New(byokresolver.Pool{Screener: strongProv, Strong: strongProv}, vault, pool)
 	verdictCache := cache.New(rdb, factcheck.PromptVersion)
 	hub := checkstream.NewHub()
 	pipeline := factcheck.NewPipeline(factcheck.Deps{
-		DB: pool, Resolver: resolver, Search: sx, Cache: verdictCache, Hub: hub, Scraper: scraperSvc,
+		DB: pool, Resolver: resolver, Search: sx, Cache: verdictCache, Hub: hub,
+		Scraper:  scraperSvc,
+		Reranker: factcheck.SourceReranker{Registry: sourceReg},
 	})
 	checkH := handlers.NewCheckV2(pool, pipeline, hub)
 	byokH := handlers.NewBYOKKeys(pool, vault)
+	sourcesH := handlers.NewSources(pool, sourceReg)
+	journalistH := handlers.NewJournalist(pool, sourceReg)
 
 	// Legacy single-shot handler kept ONLY for /health; the /api/check
 	// endpoints are now backed by the new pipeline.
@@ -196,6 +208,18 @@ func main() {
 	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Get("/api/me/keys", byokH.List)
 	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Post("/api/me/keys", byokH.Set)
 	r.With(auth.Required(pool), limiter.Middleware("/api/me/keys")).Delete("/api/me/keys", byokH.Delete)
+
+	// Curated sources — public list, admin CRUD
+	r.With(limiter.Middleware("/api/sources")).Get("/api/sources", sourcesH.List)
+	r.With(auth.Required(pool), limiter.Middleware("/api/admin/sources")).Post("/api/admin/sources", sourcesH.Add)
+	r.With(auth.Required(pool), limiter.Middleware("/api/admin/sources")).Delete("/api/admin/sources", sourcesH.Deactivate)
+
+	// Journalist program
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/journalist")).Post("/api/me/journalist-application", journalistH.Submit)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/journalist")).Get("/api/me/journalist-application", journalistH.Mine)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/journalist")).Delete("/api/me/journalist-application", journalistH.Withdraw)
+	r.With(auth.Required(pool), limiter.Middleware("/api/admin/journalist")).Get("/api/admin/journalist-applications", journalistH.AdminList)
+	r.With(auth.Required(pool), limiter.Middleware("/api/admin/journalist")).Post("/api/admin/journalist-applications/{id}/decide", journalistH.AdminDecide)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

@@ -32,6 +32,7 @@ type Deps struct {
 	Cache              *cache.Cache
 	Hub                *checkstream.Hub
 	Scraper            *scraperpkg.ScraperService
+	Reranker           Reranker // optional — nil falls back to no rerank
 	OverallTimeout     time.Duration
 	MaxClaims          int
 	MaxQueriesPerClaim int
@@ -364,6 +365,13 @@ func (p *Pipeline) processClaim(
 			},
 		}
 	}
+	// Curated-source rerank: bring tier1/tier2 to the top of the pool so
+	// investigators see them first. Tier lookup keyed by URL flows into
+	// citation persistence so the API response can show "Vetted source" badges.
+	var tierByDomain map[string]string
+	if p.deps.Reranker != nil {
+		pool, tierByDomain = p.deps.Reranker.Rerank(ctx, pool)
+	}
 	emit("pool", 55, fmt.Sprintf("source pool ready (%d sources, %d domains)", len(pool), DistinctDomainCount(pool)),
 		map[string]any{"sources": len(pool), "domains": DistinctDomainCount(pool)})
 
@@ -417,9 +425,14 @@ func (p *Pipeline) processClaim(
 			runID, perr := persist.InsertAgentRun(ctx, p.deps.DB, runRow)
 			if perr == nil {
 				for _, citedURL := range rep.CitedURLs {
+					dom := search.ExtractDomain(citedURL)
+					tier := "unknown"
+					if t, ok := tierByDomain[dom]; ok {
+						tier = t
+					}
 					_ = persist.InsertCitation(ctx, p.deps.DB, persist.Citation{
 						AgentRunID: runID, URL: citedURL,
-						Domain: search.ExtractDomain(citedURL), TrustTier: "unknown",
+						Domain: dom, TrustTier: tier,
 					})
 				}
 			}
