@@ -242,17 +242,21 @@ func (s *Service) Login(w http.ResponseWriter, r *http.Request) {
 		// failed logins can't race past the threshold without locking.
 		// CASE WHEN ... THEN NOW()+interval ELSE locked_until END keeps an
 		// existing lock if a parallel request just set one.
-		_, _ = s.Pool.Exec(r.Context(),
+		if _, err := s.Pool.Exec(r.Context(),
 			`UPDATE users
 			   SET failed_login_count = failed_login_count + 1,
 			       locked_until = CASE
-			         WHEN failed_login_count + 1 >= $2 THEN NOW() + ($3 || ' seconds')::INTERVAL
+			         WHEN failed_login_count + 1 >= $2 THEN NOW() + make_interval(secs => $3)
 			         ELSE locked_until
 			       END,
 			       updated_at = NOW()
 			 WHERE id = $1`,
 			userID, s.LockoutThreshold, int(s.LockoutDuration.Seconds()),
-		)
+		); err != nil {
+			// Logging the UPDATE failure is critical — without it the lockout
+			// silently never engages and brute-force becomes free.
+			slog.Error("login: lockout counter update", "err", err)
+		}
 		audit.Log(r.Context(), s.Pool, &userID, "auth.login.fail", "user", body.Email, r, map[string]any{"reason": "wrong_password"})
 		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return

@@ -91,7 +91,7 @@ func LookupSession(ctx context.Context, pool *pgxpool.Pool, rawToken string) (Se
 		  WHERE s.token_hash = $1
 		    AND s.user_id = u.id
 		    AND s.expires_at > NOW()
-		    AND s.last_used_at > NOW() - ($2 || ' seconds')::INTERVAL
+		    AND s.last_used_at > NOW() - make_interval(secs => $2)
 		RETURNING s.user_id, u.plan, s.csrf_token, s.expires_at`,
 		hash, int(sessionIdleTTL.Seconds()),
 	).Scan(&userID, &plan, &csrfBytes, &expiresAt)
