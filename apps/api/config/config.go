@@ -1,75 +1,114 @@
+// Package config loads the process configuration from environment variables.
+// Single canonical struct so every other package gets typed access.
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
-// Config holds all application configuration
 type Config struct {
 	// Server
-	Port string
-	Host string
+	Port  string
+	Host  string
+	Debug bool
 
-	// AI Provider
+	// AI Provider (Phase 0 leftovers)
 	AIProvider    string
 	MistralAPIKey string
 
-	// External Services
+	// External services
 	InstagramServiceURL string
 
-	// Feature Flags
-	Debug bool
+	// Auth + UI
+	BaseURL         string   // public origin of the WEB app (used in email links)
+	AllowedOrigins  []string // CORS origins
+	CookieSecure    bool
+	// CIDRs (or bare IPs) of reverse proxies whose X-Forwarded-For we trust.
+	// Empty (default) = NEVER trust XFF. Behind Caddy / Docker, set to e.g.
+	// "127.0.0.1/32,::1/128,172.16.0.0/12". Caddy must overwrite (not append)
+	// inbound XFF — its default behavior does this.
+	TrustedProxies []string
+
+	// Postgres
+	DatabaseURL string
+
+	// Redis
+	RedisURL string
+
+	// Captcha
+	HCaptchaSecret string
+
+	// BYOK (Phase 2 — present so dev .env doesn't error if set)
+	BYOKMasterKey string
 }
 
-// Global configuration instance
+// Global instance set by Load.
 var App Config
 
-// Load reads configuration from environment variables
-func Load() {
+// Load reads from env. Returns an error for misconfigurations that would
+// prevent the API from starting; warnings are logged but not fatal.
+func Load() error {
 	App = Config{
-		// Server config
-		Port: getEnv("PORT", "8080"),
-		Host: getEnv("HOST", "0.0.0.0"),
-
-		// AI config
-		AIProvider:    getEnv("AI_PROVIDER", "mistral"),
-		MistralAPIKey: getEnv("MISTRAL_API_KEY", ""),
-
-		// External services
+		Port:                getEnv("PORT", "8080"),
+		Host:                getEnv("HOST", "0.0.0.0"),
+		Debug:               getEnvBool("DEBUG", false),
+		AIProvider:          getEnv("AI_PROVIDER", "mistral"),
+		MistralAPIKey:       getEnv("MISTRAL_API_KEY", ""),
 		InstagramServiceURL: getEnv("INSTAGRAM_SERVICE_URL", "http://localhost:5001"),
-
-		// Debug
-		Debug: getEnvBool("DEBUG", false),
+		BaseURL:             getEnv("BASE_URL", "http://localhost:3000"),
+		AllowedOrigins:      getEnvList("ALLOWED_ORIGINS", []string{"http://localhost:3000", "http://localhost:5173"}),
+		CookieSecure:        getEnvBool("COOKIE_SECURE", false),
+		TrustedProxies:      getEnvList("TRUSTED_PROXIES", nil),
+		DatabaseURL:         getEnv("DATABASE_URL", ""),
+		RedisURL:            getEnv("REDIS_URL", ""),
+		HCaptchaSecret:      getEnv("HCAPTCHA_SECRET", ""),
+		BYOKMasterKey:       getEnv("BYOK_MASTER_KEY", ""),
 	}
 
-	log.Printf("[Config] Loaded configuration:")
-	log.Printf("[Config]   Port: %s", App.Port)
-	log.Printf("[Config]   AI Provider: %s", App.AIProvider)
-	log.Printf("[Config]   Instagram Service: %s", App.InstagramServiceURL)
-	log.Printf("[Config]   Debug: %v", App.Debug)
-
-	// Validate required config
-	if App.MistralAPIKey == "" {
-		log.Printf("[Config] WARNING: MISTRAL_API_KEY not set")
+	if App.DatabaseURL == "" {
+		return fmt.Errorf("config: DATABASE_URL is required")
 	}
+	if App.RedisURL == "" {
+		return fmt.Errorf("config: REDIS_URL is required")
+	}
+	return nil
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func getEnv(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	return defaultValue
+	return def
 }
 
-func getEnvBool(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return defaultValue
+func getEnvBool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			return b
 		}
-		return b
 	}
-	return defaultValue
+	return def
+}
+
+func getEnvList(key string, def []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return def
+	}
+	return out
 }

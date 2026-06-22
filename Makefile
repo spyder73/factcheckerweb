@@ -46,8 +46,13 @@ lint:  ## Lint Go + JS.
 	cd apps/api && go vet ./...
 	cd apps/web && npm run lint
 
-test:  ## Run all tests (none yet — Phase 1+).
+test:  ## Run unit tests (skips DB-integration ones unless TEST_DATABASE_URL is set).
 	cd apps/api && go test ./...
 
-migrate:  ## Run DB migrations (Phase 1+).
-	@echo "TODO Phase 1: wire goose against infra/migrations/"
+test-integration:  ## Bring up postgres, create alethea_test, run integration tests.
+	@$(COMPOSE) up -d postgres
+	@$(COMPOSE) exec -T postgres psql -U $${POSTGRES_USER:-alethea} -c "CREATE DATABASE alethea_test" 2>/dev/null || true
+	@cd apps/api && TEST_DATABASE_URL=postgres://$${POSTGRES_USER:-alethea}:$${POSTGRES_PASSWORD:-alethea_dev_change_me}@localhost:5432/alethea_test?sslmode=disable go test -count=1 ./...
+
+migrate:  ## Migrations auto-run on api startup; this target is a manual nudge.
+	@cd apps/api && DATABASE_URL=$${DATABASE_URL:-postgres://alethea:alethea_dev_change_me@localhost:5432/alethea?sslmode=disable} go run . -migrate-only 2>/dev/null || echo "migrations apply automatically on 'make dev'"

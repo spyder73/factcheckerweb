@@ -4,7 +4,7 @@
 # Choose the target at build time via docker-compose `target:`.
 
 # ---------- base deps ----------
-FROM golang:1.21-alpine AS deps
+FROM golang:1.23-alpine AS deps
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 COPY go.mod go.sum ./

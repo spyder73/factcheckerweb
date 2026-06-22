@@ -171,6 +171,7 @@ abuse_reports      (id, check_id, reporter_user|ip, reason, status)
 - **Passwords**: argon2id with sane params, never logged, never echoed
 - **Sessions**: rotate on privilege change, max 30d, idle timeout 7d
 - **Rate limiting**: token-bucket per (IP, endpoint) for anon, per (user, endpoint) for auth, stricter on `/auth/*` and `/check`
+- **Trusted-proxy aware client-IP**: `X-Forwarded-For` is honored ONLY when `r.RemoteAddr` is in the configured `TRUSTED_PROXIES` CIDR list. Empty list = always use the connection peer (anti-spoof default for direct exposure). Behind Caddy: set `TRUSTED_PROXIES=127.0.0.1/32,::1/128,172.16.0.0/12` and rely on Caddy's default XFF-overwrite behavior.
 - **SSRF defense on user-supplied URLs**: critical because the scraper fetches arbitrary URLs. Resolve DNS once, reject private/loopback/link-local/IPv6-ULA/cloud-metadata IPs (169.254.169.254, fd00::/8, 10/8, 172.16/12, 192.168/16, 127/8). Custom `DialContext` that re-checks the resolved IP at connect time (TOCTOU). Only http/https schemes, max body size, max redirects (3), strict timeout.
 - **URL allowlist**: in addition to SSRF block, scope by platform: instagram.com, x.com/twitter.com, tiktok.com, facebook.com, youtube.com, plus generic HTTPS with the SSRF guard. Reject everything else with a clear message.
 - **Prompt injection mitigation**: scraped text wrapped in `<<<CONTENT>>>...<<</CONTENT>>>` blocks with explicit instruction to treat as untrusted; never put user URL/content in system prompt; strip null bytes; cap length.
@@ -207,14 +208,25 @@ Each phase has a clear "done" condition.
 - Per-app Dockerfiles (dev + prod targets where relevant)
 - **Done when:** `make dev` boots all services and existing fact-check pipeline still works end-to-end.
 
-### Phase 1 — DB + Auth + RateLimit (3-5 days)
+### Phase 1 — DB + Auth + RateLimit ✅
 
-- `db/` with goose migrations + sqlc; tables from §3 minus journalist/sources
-- `/auth/signup`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/forgot`, `/auth/reset`
-- **OAuth: Google, Apple (mandatory if any social login on iOS), magic-link**
-- Session middleware, CSRF middleware, rate-limit middleware
-- Tests for auth happy path + lockout
-- **Done when:** signup → login → authenticated `/check` works; rate-limit returns 429 with `Retry-After`.
+- `db/` with goose migrations (embedded) and pgx pool — sqlc deferred until Phase 2+ query growth justifies it
+- Tables shipped: `users`, `sessions`, `email_tokens`, `audit_log`
+- `/auth/signup`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/forgot`, `/auth/reset`, `/auth/verify`
+- Argon2id password hashing (OWASP 2025 params), opaque session cookies (HttpOnly/Secure/SameSite=Lax), CSRF double-submit middleware tied to a per-session token, rate-limit middleware (Redis sliding window)
+- Account lockout after N failed logins (default 8 → 15min lock)
+- Audit log appended for every auth-significant event
+- Structured logging (`log/slog`) with PII redactor (emails, bearer tokens, sensitive keys)
+- hCaptcha integration (NoCaptcha fallback when secret not set — dev only)
+- LogMailer for dev email links; SMTPMailer wired in Phase 7
+- Env-driven CORS (`ALLOWED_ORIGINS`), config struct centralized
+- Unit tests (password, tokens) + integration test scaffolding (gated on `TEST_DATABASE_URL`)
+
+### Phase 1.5 — Social login (before mobile)
+
+- OAuth: Google, Apple (mandatory if any social login on iOS), magic-link
+- 2FA TOTP enrolment flow (DB columns already exist)
+- Should land before Phase 6 mobile work begins.
 
 ### Phase 2 — Pipeline v2 (5-7 days)
 
@@ -346,6 +358,9 @@ Things only you can do — track separately from this codebase work.
 | 2026-06-22 | Auth: Postgres + Go sessions (no RLS) | Only Go talks to DB; RLS not needed. |
 | 2026-06-22 | Go module renamed `fact-checker` → `alethea/api` | Aligns with monorepo path; clear ownership. |
 | 2026-06-22 | Verdict taxonomy unchanged (7 categories) | Existing categories cover the needed nuance. |
+| 2026-06-22 | Migrations live with the binary at `apps/api/db/migrations/` (go:embed) | Self-contained prod binary; no external mount needed. |
+| 2026-06-22 | sqlc deferred until Phase 2+ | Phase 1 queries are simple enough that hand-written pgx is faster to ship. |
+| 2026-06-22 | OAuth deferred to Phase 1.5 (before mobile) | Keep Phase 1 shippable; password auth is enough for web launch. |
 
 ---
 
