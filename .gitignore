@@ -1,9 +1,13 @@
-# Environment variables
+# Environment / secrets
 .env
 .env.local
 .env.*.local
 .env.development
 .env.production
+*.pem
+*.key
+*.p12
+secrets/
 
 # Go
 *.exe
@@ -13,50 +17,61 @@
 *.dylib
 *.test
 *.out
-/vendor/
-/bin/
-/pkg/
+vendor/
+bin/
+pkg/
 go.work
+go.work.sum
 
-# Node.js / TypeScript / Frontend
+# Node / TypeScript / Frontend
 node_modules/
-/dist
-/dist-ssr
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.vite/
 *.local
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# TypeScript
-*.tsbuildinfo
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+services/**/venv/
+services/**/__pycache__/
 
-# Build outputs
-/build
-/out
-/.next/
-/.nuxt/
-/.vite/
-
-# Editor directories and files
+# Editor / OS
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# OS files
-.DS_Store
-Thumbs.db
-
 # Logs
-logs
+logs/
 *.log
 
-instagram-service/venv
-instagram-service/__pycache__
+# Infra runtime
+infra/postgres-data/
+infra/redis-data/
+infra/backup/*.sql
+infra/backup/*.sql.gz
+infra/backup/*.age
+!infra/migrations/.gitkeep
+!infra/backup/.gitkeep
+!packages/shared-types/.gitkeep
