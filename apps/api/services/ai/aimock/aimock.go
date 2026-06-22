@@ -119,7 +119,11 @@ func (m *Mock) record(c Call) response {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls = append(m.calls, c)
-	for _, r := range m.rules {
+	// Iterate rules in REVERSE so later .OnSystem*/.OnUser calls override
+	// earlier ones for the same key. Tests rely on this for "set up baseline
+	// in setup, then override one rule in the test body" patterns.
+	for i := len(m.rules) - 1; i >= 0; i-- {
+		r := m.rules[i]
 		if strings.HasPrefix(r.systemPrefix, "\x00CONTAINS\x00") {
 			sub := strings.TrimPrefix(r.systemPrefix, "\x00CONTAINS\x00")
 			if strings.Contains(c.SystemPrompt, sub) {

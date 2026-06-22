@@ -110,6 +110,9 @@ func (c *Channel) Emit(e Event) {
 	}
 	e.Seq = c.nextSeq
 	c.nextSeq++
+	if e.Timestamp.IsZero() {
+		e.Timestamp = time.Now().UTC()
+	}
 	if len(c.buf) >= ringSize {
 		copy(c.buf, c.buf[1:])
 		c.buf = c.buf[:len(c.buf)-1]
