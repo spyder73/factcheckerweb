@@ -143,8 +143,10 @@ func main() {
 	hub := checkstream.NewHub()
 	pipeline := factcheck.NewPipeline(factcheck.Deps{
 		DB: pool, Resolver: resolver, Search: sx, Cache: verdictCache, Hub: hub,
-		Scraper:  scraperSvc,
-		Reranker: factcheck.SourceReranker{Registry: sourceReg},
+		Scraper:          scraperSvc,
+		Reranker:         factcheck.SourceReranker{Registry: sourceReg},
+		MaxMediaItems:    cfg.MaxMediaItems,
+		MediaConcurrency: cfg.MediaConcurrency,
 	})
 	checkH := handlers.NewCheckV2(pool, pipeline, hub)
 	byokH := handlers.NewBYOKKeys(pool, vault)

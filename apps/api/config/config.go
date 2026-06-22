@@ -43,6 +43,11 @@ type Config struct {
 
 	// BYOK (Phase 2 — present so dev .env doesn't error if set)
 	BYOKMasterKey string
+
+	// Pipeline pacing. Defaults are tuned for Mistral free tier (~1 req/sec).
+	// Raise on a paid plan / OpenRouter; rate-limit retry is in the client either way.
+	MaxMediaItems    int // default 6 — max images analyzed per check
+	MediaConcurrency int // default 2 — concurrent vision calls
 }
 
 // Global instance set by Load.
@@ -66,6 +71,8 @@ func Load() error {
 		RedisURL:            getEnv("REDIS_URL", ""),
 		HCaptchaSecret:      getEnv("HCAPTCHA_SECRET", ""),
 		BYOKMasterKey:       getEnv("BYOK_MASTER_KEY", ""),
+		MaxMediaItems:       getEnvInt("MAX_MEDIA_ITEMS", 6),
+		MediaConcurrency:    getEnvInt("MEDIA_CONCURRENCY", 2),
 	}
 
 	if App.DatabaseURL == "" {
@@ -80,6 +87,15 @@ func Load() error {
 func getEnv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func getEnvInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
 	}
 	return def
 }

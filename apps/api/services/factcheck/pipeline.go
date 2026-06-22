@@ -37,6 +37,10 @@ type Deps struct {
 	MaxClaims          int
 	MaxQueriesPerClaim int
 	HitsPerQuery       int
+	// Media-analysis tunables. Defaults are tuned for Mistral free tier
+	// (~1 req/sec). Raise on a paid plan or OpenRouter via env in main.go.
+	MaxMediaItems       int // 0 = default 6
+	MediaConcurrency    int // 0 = default 2
 }
 
 func (d *Deps) defaults() {
@@ -112,9 +116,13 @@ func (p *Pipeline) Run(parentCtx context.Context, checkID uuid.UUID, in CheckInp
 	// --- media analysis (optional) ---
 	var mediaAnalyses []MediaAnalysis
 	if len(content.MediaURLs) > 0 && keys.Judge().SupportsVision() {
-		emit("media", 12, fmt.Sprintf("analyzing %d image(s)", min(len(content.MediaURLs), 6)),
-			map[string]any{"count": min(len(content.MediaURLs), 6)})
-		mediaAnalyses = runMediaAnalysis(ctx, keys.Judge(), content.MediaURLs, 6)
+		cap := p.deps.MaxMediaItems
+		if cap == 0 {
+			cap = 6
+		}
+		n := min(len(content.MediaURLs), cap)
+		emit("media", 12, fmt.Sprintf("analyzing %d image(s)", n), map[string]any{"count": n})
+		mediaAnalyses = runMediaAnalysis(ctx, keys.Judge(), content.MediaURLs, p.deps.MaxMediaItems, p.deps.MediaConcurrency)
 	}
 
 	// --- claim extraction ---

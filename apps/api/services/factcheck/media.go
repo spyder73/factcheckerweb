@@ -30,23 +30,29 @@ type MediaAnalysis struct {
 }
 
 // runMediaAnalysis sends each media item through the vision-capable provider
-// in parallel. Caps concurrency to 4 to avoid hammering the API. Returns
-// per-image analyses in original order, with error reports captured inline.
+// in parallel. Returns per-image analyses in original order, with errors
+// captured inline so one bad image doesn't poison the rest.
 //
-// Per-image cap of 6 items prevents a 20-image carousel from exploding cost.
-func runMediaAnalysis(ctx context.Context, prov ai.Provider, mediaURLs []string, maxItems int) []MediaAnalysis {
+// `maxItems` caps how many images get analyzed (cost containment).
+// `concurrency` caps how many analyze in parallel (rate-limit containment).
+// Defaults (6, 2) are tuned for Mistral free tier (~1 req/sec). Raise both
+// once on a paid plan or OpenRouter; lower to 1/1 for very strict tiers.
+func runMediaAnalysis(ctx context.Context, prov ai.Provider, mediaURLs []string, maxItems, concurrency int) []MediaAnalysis {
 	if !prov.SupportsVision() || len(mediaURLs) == 0 {
 		return nil
 	}
 	if maxItems <= 0 {
 		maxItems = 6
 	}
+	if concurrency <= 0 {
+		concurrency = 2
+	}
 	items := mediaURLs
 	if len(items) > maxItems {
 		items = items[:maxItems]
 	}
 	out := make([]MediaAnalysis, len(items))
-	sem := make(chan struct{}, 4)
+	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, u := range items {
 		wg.Add(1)
