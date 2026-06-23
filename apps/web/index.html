@@ -4,14 +4,29 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0A0A0F" />
-    <meta name="description" content="Alethea — open-source, evidence-based fact-checking for everyone. Verify any social media claim with multi-agent AI and traceable sources." />
+    <meta name="description" content="Alethea — open-source, evidence-based fact-checking. Paste a link, see the evidence. Skeptical by default." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FCFCFD" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A0A0B" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <title>Alethea — fact-check anything</title>
+    <!-- Theme bootstrap. Runs BEFORE React mounts so the page never flashes
+         the wrong theme. Persists override at localStorage 'alethea:theme'. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('alethea:theme');
+          var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = stored === 'dark' || stored === 'light' ? stored : (systemDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) { /* localStorage blocked — fall through */ }
+      })();
+    </script>
   </head>
   <body>
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:bg-bg-elevated focus:px-3 focus:py-2 focus:rounded focus:ring-2 focus:ring-accent">Skip to main content</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

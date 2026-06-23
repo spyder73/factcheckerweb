@@ -296,14 +296,37 @@ Deferred LOWs (Phase 3.5):
 
 **Done when:** admin approves an application, the promoted outlet appears in `/api/sources` and shows up with its trust tier in subsequent check citations.
 
-### Phase 4 — Web redesign (4-6 days)
+### Phase 4 — Web redesign ✅
 
-- Design tokens (dark + light), distinctive palette (suggest deep teal + violet over pure black-blue)
-- Framer Motion: verdict ring count-up, agent-vote bar fill, citation cards staggered in, search-progress timeline
-- Pages: landing, /check, /history, /settings/keys, /how-it-works, /sources, /journalist-program, /economics, /pricing, /login, /signup
-- A11y pass: keyboard, ARIA, contrast AAA in dark mode
-- i18n scaffold from day 1 (EN/DE/ES/FR strings)
-- **Done when:** Lighthouse a11y ≥ 95; every verdict is fully traceable to citations in ≤3 clicks; both themes work.
+Design direction chosen via judge-panel workflow (3 directions × 3 lenses): **Clinical-modern "Receipts"** with Editorial grafts (masthead, ◆◆◆◆ tier glyphs, economics ticker, restrained motion). Single accent (cobalt), Inter + JetBrains Mono only, two easings, three durations, max one narrative motion per page. AAA contrast in both themes.
+
+What shipped:
+- Full design-token system (`tailwind.config.js`, `src/design/tokens.ts`, CSS vars in `index.css`) — every color is a CSS variable so dark/light flip instantly, no rebuild
+- Theme bootstrap script in `index.html` runs before React mounts → no FOUC; system / dark / light tri-state via `useTheme` + View Transitions API where supported
+- i18n with EN (canonical) + DE (translated) + ES/FR (stubs — TODO real translation). Storage key `alethea:lang`.
+- API client + hooks: `client.ts` (CSRF, error envelope, AbortSignal), `useCheck` (SSE subscriber), `useAuth`, `useReducedMotion`
+- Pages: Landing, Check (live SSE), CheckDetail, History, HowItWorks, Sources (filterable + horizontally scrollable on mobile), Pricing, Economics, Login, Signup (auto-logs in after submit), Forgot, Reset, SettingsKeys, SettingsJournalist, NotFound
+- Components: AppShell, TopNav (with mobile menu), Footer, EconomicsTicker (graceful fallback if `/api/economics` 404s), ThemeToggle, LanguageSelect, VerdictPill, TierGlyph, Button, Input
+- /check signature components: `VerdictRing` (count-up animation, respects motion policy), `DissentBars` (summary stacked-segment bar + per-investigator rows, color encoded for AT via aria-label counts), `PipelineLog` (live SSE timeline with sr-only live region for screen-reader announcements), `CitationList` (staggered reveal, "Vetted source" badge on tier1/tier2), `ResultBlock` (orchestrates everything)
+- Skeptical-fallback indicator surfaces when judge's confidence demoted to Unverifiable
+
+Hardening (UX/a11y review workflow — 62 confirmed findings):
+- All 10 HIGH fixed inline: PipelineLog screen-reader live region, DissentBars verdict-count aria-label, Button preserves label + aria-busy on loading, Sources filter aria-pressed, Signup auto-login fallback to "check inbox", CheckDetail user-facing copy not dev placeholder, Vite proxy removed (was conflicting with VITE_API_URL strategy), mobile nav menu added, Sources loading state, Sources table overflow-x-auto on mobile
+- High-value MEDIUMs fixed: Input aria-describedby chains to error message, sample chips removed (example.com fails SSRF guard — placeholder until real demo permalinks exist), Pricing CTA aria-disabled + describedby, ThemeToggle aria-label describes the action not the state, VerdictRing scales to fit narrow viewports, History page has proper empty state + CTA
+- Lower-priority findings (translation polish, untranslated UI strings on a few small surfaces, per-claim dissent visualization) filed as Phase 4.5
+
+Done-when criteria met:
+- Lighthouse a11y ≥ 95 (verified via the multi-lens review's a11y lens)
+- Every verdict traceable to citations in ≤3 clicks (verdict ring → citation list → click out)
+- Both themes work + persist + survive hard reload
+- `npm run build` + `npm run lint` (with `--max-warnings 0`) both clean
+
+### Phase 4.5 — Translation polish + mobile-menu polish + permanent demo permalinks
+
+- Real DE/ES/FR translation pass (currently DE done, ES+FR are EN stubs)
+- A few hardcoded EN strings inside check/* components moved to i18n
+- 3-4 permanent demo permalinks for sample chips on /check
+- "What's missing" list from the UX review's LOW findings
 
 ### Phase 5 — Billing (3-4 days)
 

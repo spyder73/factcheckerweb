@@ -1,112 +1,170 @@
+/* Theme vars. data-theme attribute on <html>; default = system, override = localStorage 'alethea:theme'.
+   All colors are RGB triples so Tailwind's <alpha-value> syntax works. */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+:root,
+[data-theme="light"] {
+  --color-bg:           252 252 253;
+  --color-bg-elevated:  255 255 255;
+  --color-bg-sunken:    244 244 246;
+  --color-bg-inverse:   10 10 11;
+  --color-border-subtle: 235 235 239;
+  --color-border:        220 220 226;
+  --color-border-strong: 184 184 194;
+  --color-fg-muted:   113 113 122;
+  --color-fg-subtle:  82 82 91;
+  --color-fg:         39 39 42;
+  --color-fg-strong:  9 9 11;
+  --color-fg-inverse: 245 245 247;
+  --color-accent:         37 99 235;
+  --color-accent-hover:   29 78 216;
+  --color-accent-pressed: 30 64 175;
+  --color-accent-bg:      239 244 255;
+  --color-accent-fg:      255 255 255;
+  --color-verdict-verified:           22 163 74;
+  --color-verdict-verified-bg:        236 253 243;
+  --color-verdict-mostly-true:        101 163 13;
+  --color-verdict-mostly-true-bg:     247 254 231;
+  --color-verdict-partially-true:    180 121 4;
+  --color-verdict-partially-true-bg: 254 250 232;
+  --color-verdict-misleading:         194 75 22;
+  --color-verdict-misleading-bg:      255 244 235;
+  --color-verdict-false:              185 28 28;
+  --color-verdict-false-bg:           254 242 242;
+  --color-verdict-unverifiable:       113 113 122;
+  --color-verdict-unverifiable-bg:    244 244 246;
+  --color-verdict-satire:             126 34 206;
+  --color-verdict-satire-bg:          250 245 255;
+  --color-verdict-no-claim:           7 89 133;
+  --color-verdict-no-claim-bg:        240 249 255;
+  --color-focus:     37 99 235;
+  --color-selection: 219 233 255;
+  color-scheme: light;
 }
 
+[data-theme="dark"] {
+  --color-bg:           10 10 11;
+  --color-bg-elevated:  17 17 19;
+  --color-bg-sunken:    7 7 8;
+  --color-bg-inverse:   252 252 253;
+  --color-border-subtle: 28 28 31;
+  --color-border:        38 38 43;
+  --color-border-strong: 58 58 66;
+  --color-fg-muted:   154 154 164;
+  --color-fg-subtle:  186 186 196;
+  --color-fg:         228 228 233;
+  --color-fg-strong:  245 245 247;
+  --color-fg-inverse: 39 39 42;
+  --color-accent:         96 165 250;
+  --color-accent-hover:   147 197 253;
+  --color-accent-pressed: 191 219 254;
+  --color-accent-bg:      15 27 51;
+  --color-accent-fg:      10 10 11;
+  --color-verdict-verified:           74 222 128;
+  --color-verdict-verified-bg:        11 31 20;
+  --color-verdict-mostly-true:        163 230 53;
+  --color-verdict-mostly-true-bg:     20 31 10;
+  --color-verdict-partially-true:    250 204 21;
+  --color-verdict-partially-true-bg: 31 26 8;
+  --color-verdict-misleading:         251 146 60;
+  --color-verdict-misleading-bg:      31 18 10;
+  --color-verdict-false:              248 113 113;
+  --color-verdict-false-bg:           31 12 12;
+  --color-verdict-unverifiable:       154 154 164;
+  --color-verdict-unverifiable-bg:    20 20 22;
+  --color-verdict-satire:             192 132 252;
+  --color-verdict-satire-bg:          24 16 31;
+  --color-verdict-no-claim:           125 211 252;
+  --color-verdict-no-claim-bg:        8 22 31;
+  --color-focus:     147 197 253;
+  --color-selection: 30 58 95;
+  color-scheme: dark;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 html {
-  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  font-feature-settings: 'cv11' 1, 'ss03' 1, 'cv02' 1;
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #0A0A0F;
-  color: #ffffff;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-fg));
   min-height: 100vh;
-  overflow-x: hidden;
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+h1, h2, h3, h4 {
+  text-wrap: balance;
+  color: rgb(var(--color-fg-strong));
+  font-weight: 600;
 }
 
-::-webkit-scrollbar-track {
-  background: #0D1117;
+.prose-measure { max-width: 68ch; }
+
+::selection {
+  background: rgb(var(--color-selection));
+  color: rgb(var(--color-fg-strong));
 }
 
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #21262D;
+  background: rgb(var(--color-border));
+  border-radius: 6px;
+  border: 2px solid rgb(var(--color-bg));
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-border-strong)); }
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-focus));
+  outline-offset: 2px;
   border-radius: 4px;
 }
+:focus:not(:focus-visible) { outline: none; }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #0066FF;
+.hairline-grid {
+  background-image:
+    linear-gradient(to right, rgb(var(--color-border-subtle) / 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--color-border-subtle) / 0.5) 1px, transparent 1px);
+  background-size: 80px 80px;
 }
 
-/* Gradient text utility */
-.gradient-text {
-  background: linear-gradient(135deg, #0066FF, #00D4FF);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Glow effects */
-.glow-blue {
-  box-shadow: 0 0 20px rgba(0, 102, 255, 0.3),
-              0 0 40px rgba(0, 102, 255, 0.2),
-              0 0 60px rgba(0, 102, 255, 0.1);
-}
-
-.glow-border {
-  position: relative;
-}
-
-.glow-border::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(135deg, #0066FF, #00D4FF);
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0.5;
-  filter: blur(10px);
-}
-
-/* Glass effect */
-.glass {
-  background: rgba(26, 26, 46, 0.6);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Animated background gradient */
-.animated-bg {
-  background: linear-gradient(
-    45deg,
-    #0A0A0F,
-    #0D1117,
-    #161B22,
-    #0D1117,
-    #0A0A0F
-  );
-  background-size: 400% 400%;
-  animation: gradient-shift 15s ease infinite;
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* Pulse ring animation */
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
-  100% {
-    transform: scale(2);
-    opacity: 0;
+  .ticker-scroll-rm { animation: none !important; }
+}
+
+@supports (view-transition-name: root) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 240ms;
+    animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
   }
 }
 
-.pulse-ring {
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+.tabular { font-variant-numeric: tabular-nums; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
 }
+.ticker-track > * { padding-right: 48px; }

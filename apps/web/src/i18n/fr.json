@@ -1,0 +1,246 @@
+{
+  "brand": {
+    "name": "Alethea",
+    "tagline": "Fact-check anything — see the evidence",
+    "footer": "Open-source, evidence-based fact-checking. Greek ἀλήθεια — truth, the absence of forgetting."
+  },
+  "nav": {
+    "check": "Check",
+    "history": "History",
+    "sources": "Sources",
+    "howItWorks": "How it works",
+    "pricing": "Pricing",
+    "economics": "Economics",
+    "login": "Sign in",
+    "signup": "Sign up",
+    "settings": "Settings",
+    "logout": "Sign out",
+    "byok": "API keys",
+    "journalist": "Journalist program"
+  },
+  "landing": {
+    "hero": {
+      "headline": "Paste a link. See the evidence.",
+      "subline": "Alethea reads a social-media post, asks the right questions, gathers sources, and shows you exactly how it reached its verdict. No black box. Skeptical by default — if the evidence is thin, we say so.",
+      "cta": "Try a sample claim",
+      "ctaSecondary": "How it works"
+    },
+    "stages": {
+      "scrape": "Read the post",
+      "extract": "Find the testable claims",
+      "investigate": "Search the open web",
+      "judge": "Synthesize a verdict",
+      "explain": "Show the evidence"
+    },
+    "promise": {
+      "title": "Three promises",
+      "skeptical": "Skeptical by default — we'd rather say 'we don't know' than guess.",
+      "transparent": "Show our work — every verdict expands into the full agent transcript.",
+      "open": "Open source — anyone can run the same check and see the same logic."
+    }
+  },
+  "check": {
+    "input": {
+      "label": "URL of a post, article, or page",
+      "placeholder": "https://www.instagram.com/p/...",
+      "submit": "Check this",
+      "captionLabel": "Optional context",
+      "captionPlaceholder": "Paste the claim text if the page hides it"
+    },
+    "stage": {
+      "init": "Starting",
+      "resolve": "Fetching the page",
+      "media": "Reading the images",
+      "extract": "Pulling out the testable claims",
+      "screen": "Quick screen",
+      "retrieval": "Searching the open web",
+      "pool": "Source pool ready",
+      "fanout": "Asking {{n}} investigators independently",
+      "judge": "Synthesizing the verdict",
+      "cache_hit": "Served from cache",
+      "byok_fallback": "Your API key wasn't usable — falling back to Alethea's pool",
+      "done": "Done",
+      "error": "Something went wrong"
+    },
+    "result": {
+      "verdict": "Verdict",
+      "confidence": "Confidence",
+      "summary": "Summary",
+      "claims": "Claims",
+      "dissent": "Investigator votes",
+      "citations": "Sources",
+      "intent": "Why might this post exist?",
+      "steelman": "Strongest case for the claim",
+      "skeptical": "Evidence was thin — we'd rather say so than guess",
+      "cached": "Served instantly from a previous check of the same claim",
+      "vetted": "Vetted source"
+    },
+    "verdict": {
+      "verified": "Verified",
+      "false": "False",
+      "misleading": "Misleading",
+      "partially_true": "Partially true",
+      "unverifiable": "Unverifiable",
+      "satire": "Satire",
+      "no_claim": "No claim"
+    }
+  },
+  "auth": {
+    "signup": {
+      "title": "Create your Alethea account",
+      "submit": "Create account",
+      "afterTitle": "Check your inbox (or your dev logs)",
+      "afterBody": "If this email is new we sent you a verification link. Either way, you can sign in now."
+    },
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "forgot": "Forgot your password?"
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "submit": "Send reset link",
+      "after": "If we know this email we sent you a link. Check your inbox."
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "submit": "Save new password"
+    },
+    "email": "Email",
+    "password": "Password",
+    "newPassword": "New password",
+    "errors": {
+      "invalid_credentials": "Email or password is wrong.",
+      "weak_password": "Password must be at least 8 characters.",
+      "captcha_failed": "Captcha didn't verify — try again.",
+      "rate_limited": "Too many attempts. Wait a bit and try again."
+    }
+  },
+  "settings": {
+    "keys": {
+      "title": "API keys",
+      "description": "Bring your own key and the pipeline runs on your account. We never display or echo the key after you save it.",
+      "add": "Add a key",
+      "provider": "Provider",
+      "secret": "API key",
+      "label": "Label (optional)",
+      "deleted": "Removed",
+      "noKeys": "No keys connected yet."
+    },
+    "journalist": {
+      "title": "Journalist program",
+      "description": "If you write for a newsroom, apply to have your outlet recognized as a curated source.",
+      "submit": "Submit application",
+      "withdraw": "Withdraw application",
+      "fields": {
+        "fullName": "Full name",
+        "outlet": "Outlet",
+        "outletUrl": "Outlet URL",
+        "bylineUrls": "Byline URLs (one per line)",
+        "country": "Country (ISO code, optional)",
+        "beat": "Beat (optional)",
+        "bio": "Short bio (optional)"
+      },
+      "status": {
+        "pending": "Under review",
+        "approved": "Approved",
+        "rejected": "Not approved",
+        "withdrawn": "Withdrawn"
+      }
+    }
+  },
+  "sources": {
+    "title": "Curated sources",
+    "subtitle": "Outlets and primary sources Alethea recognizes by default. Investigators surface citations from these first.",
+    "filters": {
+      "category": "Category",
+      "tier": "Trust tier",
+      "all": "All"
+    },
+    "tier": {
+      "tier1": "Tier 1 — wires, peer review, .gov",
+      "tier2": "Tier 2 — major outlets",
+      "tier3": "Tier 3 — specialist or known-good",
+      "unknown": "Not yet vetted"
+    }
+  },
+  "howItWorks": {
+    "title": "How Alethea reaches a verdict",
+    "pipeline": "Five stages, every one visible to you",
+    "stages": {
+      "scrape": "We fetch the page or social-media post you submitted. URLs are validated; we never touch internal-network addresses.",
+      "extract": "A small model condenses the post + any images into a list of testable claims. Opinions and jokes are filtered out.",
+      "investigate": "N independent investigators each search the open web. They cite by source ID — they can't invent URLs because we hand them the source pool.",
+      "judge": "A stronger model synthesizes the N reports into one final verdict. Below a confidence floor we mark the claim 'Unverifiable' rather than guess.",
+      "explain": "Every verdict ships with the full agent transcript, every cited URL, the dissent vector across investigators, and a separate panel that interprets the post's intent (clearly labeled as interpretation, not fact)."
+    },
+    "verdicts": {
+      "title": "Seven verdict categories",
+      "verified": "Confirmed by reliable sources.",
+      "false": "Proven false by evidence.",
+      "misleading": "Contains truth but missing critical context.",
+      "partially_true": "Some parts true, some false.",
+      "unverifiable": "Cannot be verified with available sources.",
+      "satire": "Intentional satire or parody.",
+      "no_claim": "No factual claim was made."
+    }
+  },
+  "pricing": {
+    "title": "Pricing",
+    "free": {
+      "name": "Free",
+      "price": "€0",
+      "features": [
+        "10 checks per day",
+        "1 investigator + 1 judge",
+        "Web verdict + history"
+      ]
+    },
+    "byok": {
+      "name": "Bring your own key",
+      "price": "Free",
+      "features": [
+        "Connect your own OpenAI / Anthropic / Mistral / OpenRouter key",
+        "3 investigators by default",
+        "Your provider's rate limits apply"
+      ]
+    },
+    "plus": {
+      "name": "Alethea Plus",
+      "price": "€5 / month",
+      "yearly": "or €45 / year",
+      "features": [
+        "5 independent investigators",
+        "Strong judge model",
+        "Priority queue",
+        "Higher rate limits",
+        "Source preferences",
+        "Exportable verdict PDFs"
+      ],
+      "cta": "Start a Plus subscription"
+    }
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Remove",
+    "back": "Back",
+    "skipToContent": "Skip to main content",
+    "themeLabel": "Theme",
+    "theme": { "system": "System", "light": "Light", "dark": "Dark" },
+    "language": "Language"
+  },
+  "errors": {
+    "notFound": {
+      "title": "We couldn't find that page",
+      "body": "If you got here from a link, it might be out of date. Try the home page."
+    },
+    "checkNotFound": {
+      "title": "Check not found",
+      "body": "Either the ID is wrong, or this check belongs to a signed-in user."
+    }
+  }
+}

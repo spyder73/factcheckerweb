@@ -1,0 +1,191 @@
+{
+  "brand": {
+    "name": "Alethea",
+    "tagline": "Faktencheck für alles — sieh die Beweise",
+    "footer": "Open-Source, evidenzbasierter Faktencheck. Griechisch ἀλήθεια — Wahrheit, das Nicht-Vergessen."
+  },
+  "nav": {
+    "check": "Prüfen",
+    "history": "Verlauf",
+    "sources": "Quellen",
+    "howItWorks": "Funktionsweise",
+    "pricing": "Preise",
+    "economics": "Wirtschaft",
+    "login": "Anmelden",
+    "signup": "Registrieren",
+    "settings": "Einstellungen",
+    "logout": "Abmelden",
+    "byok": "API-Schlüssel",
+    "journalist": "Journalist:innen"
+  },
+  "landing": {
+    "hero": {
+      "headline": "Link einfügen. Beweise sehen.",
+      "subline": "Alethea liest einen Social-Media-Beitrag, stellt die richtigen Fragen, sammelt Quellen und zeigt dir genau, wie es zu seinem Urteil kam. Keine Blackbox. Standardmäßig skeptisch — wenn die Beweise dünn sind, sagen wir das.",
+      "cta": "Probier einen Beispiel-Claim",
+      "ctaSecondary": "Wie es funktioniert"
+    },
+    "stages": {
+      "scrape": "Beitrag lesen",
+      "extract": "Prüfbare Aussagen finden",
+      "investigate": "Im offenen Web suchen",
+      "judge": "Urteil synthetisieren",
+      "explain": "Beweise zeigen"
+    },
+    "promise": {
+      "title": "Drei Versprechen",
+      "skeptical": "Standardmäßig skeptisch — lieber «wir wissen es nicht» als raten.",
+      "transparent": "Arbeit zeigen — jedes Urteil öffnet das vollständige Agenten-Transkript.",
+      "open": "Open-Source — jede:r kann dieselbe Prüfung mit derselben Logik nachvollziehen."
+    }
+  },
+  "check": {
+    "input": {
+      "label": "URL eines Beitrags, Artikels oder einer Seite",
+      "placeholder": "https://www.instagram.com/p/...",
+      "submit": "Prüfen",
+      "captionLabel": "Optionaler Kontext",
+      "captionPlaceholder": "Aussage einfügen, falls die Seite sie versteckt"
+    },
+    "stage": {
+      "init": "Wird gestartet",
+      "resolve": "Seite wird geladen",
+      "media": "Bilder werden gelesen",
+      "extract": "Prüfbare Aussagen extrahieren",
+      "screen": "Schnellprüfung",
+      "retrieval": "Im offenen Web suchen",
+      "pool": "Quellenpool bereit",
+      "fanout": "{{n}} Ermittler:innen werden unabhängig befragt",
+      "judge": "Urteil wird synthetisiert",
+      "cache_hit": "Aus dem Cache geliefert",
+      "byok_fallback": "Dein API-Schlüssel war nicht nutzbar — wir greifen auf Aletheas Pool zurück",
+      "done": "Fertig",
+      "error": "Etwas ist schiefgelaufen"
+    },
+    "result": {
+      "verdict": "Urteil",
+      "confidence": "Vertrauen",
+      "summary": "Zusammenfassung",
+      "claims": "Aussagen",
+      "dissent": "Stimmen der Ermittler:innen",
+      "citations": "Quellen",
+      "intent": "Warum könnte dieser Beitrag existieren?",
+      "steelman": "Stärkstes Argument für die Aussage",
+      "skeptical": "Beweise waren dünn — lieber das sagen als raten",
+      "cached": "Sofort aus einer früheren Prüfung derselben Aussage geliefert",
+      "vetted": "Geprüfte Quelle"
+    },
+    "verdict": {
+      "verified": "Bestätigt",
+      "false": "Falsch",
+      "misleading": "Irreführend",
+      "partially_true": "Teilweise wahr",
+      "unverifiable": "Nicht überprüfbar",
+      "satire": "Satire",
+      "no_claim": "Keine Aussage"
+    }
+  },
+  "auth": {
+    "signup": {
+      "title": "Alethea-Konto erstellen",
+      "submit": "Konto erstellen",
+      "afterTitle": "Schau in deinen Posteingang",
+      "afterBody": "Wenn diese E-Mail neu ist, haben wir dir einen Bestätigungslink geschickt. So oder so kannst du dich jetzt anmelden."
+    },
+    "login": { "title": "Anmelden", "submit": "Anmelden", "forgot": "Passwort vergessen?" },
+    "forgot": { "title": "Passwort zurücksetzen", "submit": "Reset-Link senden", "after": "Falls wir diese E-Mail kennen, haben wir einen Link geschickt." },
+    "reset": { "title": "Neues Passwort wählen", "submit": "Passwort speichern" },
+    "email": "E-Mail",
+    "password": "Passwort",
+    "newPassword": "Neues Passwort",
+    "errors": {
+      "invalid_credentials": "E-Mail oder Passwort ist falsch.",
+      "weak_password": "Passwort muss mindestens 8 Zeichen lang sein.",
+      "captcha_failed": "Captcha nicht bestätigt — versuch es nochmal.",
+      "rate_limited": "Zu viele Versuche. Warte kurz und versuch es erneut."
+    }
+  },
+  "settings": {
+    "keys": {
+      "title": "API-Schlüssel",
+      "description": "Bring deinen eigenen Schlüssel mit, und die Pipeline läuft über dein Konto. Wir zeigen den Schlüssel nach dem Speichern nie wieder an.",
+      "add": "Schlüssel hinzufügen",
+      "provider": "Anbieter",
+      "secret": "API-Schlüssel",
+      "label": "Bezeichnung (optional)",
+      "deleted": "Entfernt",
+      "noKeys": "Noch keine Schlüssel verbunden."
+    },
+    "journalist": {
+      "title": "Journalist:innen-Programm",
+      "description": "Wenn du für eine Redaktion schreibst, beantrage hier, dass dein Medium als geprüfte Quelle erkannt wird.",
+      "submit": "Antrag einreichen",
+      "withdraw": "Antrag zurückziehen",
+      "fields": {
+        "fullName": "Vollständiger Name",
+        "outlet": "Medium",
+        "outletUrl": "Medium-URL",
+        "bylineUrls": "Byline-URLs (eine pro Zeile)",
+        "country": "Land (ISO-Code, optional)",
+        "beat": "Ressort (optional)",
+        "bio": "Kurze Bio (optional)"
+      },
+      "status": { "pending": "In Prüfung", "approved": "Genehmigt", "rejected": "Nicht genehmigt", "withdrawn": "Zurückgezogen" }
+    }
+  },
+  "sources": {
+    "title": "Geprüfte Quellen",
+    "subtitle": "Medien und Primärquellen, die Alethea standardmäßig erkennt. Ermittler:innen bevorzugen Zitate aus diesen.",
+    "filters": { "category": "Kategorie", "tier": "Vertrauensstufe", "all": "Alle" },
+    "tier": {
+      "tier1": "Stufe 1 — Agenturen, Peer-Review, .gov",
+      "tier2": "Stufe 2 — große Medien",
+      "tier3": "Stufe 3 — Fachmedien oder bekannt-gut",
+      "unknown": "Noch nicht geprüft"
+    }
+  },
+  "howItWorks": {
+    "title": "Wie Alethea zu einem Urteil kommt",
+    "pipeline": "Fünf Stufen, jede für dich sichtbar",
+    "stages": {
+      "scrape": "Wir laden die Seite oder den Social-Media-Beitrag. URLs werden validiert; interne Netzwerk-Adressen berühren wir nie.",
+      "extract": "Ein kleines Modell verdichtet den Beitrag + Bilder zu einer Liste prüfbarer Aussagen. Meinungen und Witze werden gefiltert.",
+      "investigate": "N unabhängige Ermittler:innen durchsuchen das offene Web. Sie zitieren per Quellen-ID — sie können keine URLs erfinden, da wir den Pool vorgeben.",
+      "judge": "Ein stärkeres Modell synthetisiert die N Berichte zu einem Urteil. Unter einer Vertrauensschwelle markieren wir die Aussage als «Nicht überprüfbar» statt zu raten.",
+      "explain": "Jedes Urteil wird mit dem vollständigen Agenten-Transkript, allen zitierten URLs, dem Stimmvektor der Ermittler:innen und einer separaten Interpretation der Beitragsabsicht (klar als Interpretation gekennzeichnet) geliefert."
+    },
+    "verdicts": {
+      "title": "Sieben Urteilskategorien",
+      "verified": "Durch verlässliche Quellen bestätigt.",
+      "false": "Durch Beweise widerlegt.",
+      "misleading": "Enthält Wahres, aber wichtige Kontexte fehlen.",
+      "partially_true": "Teile wahr, Teile falsch.",
+      "unverifiable": "Mit verfügbaren Quellen nicht überprüfbar.",
+      "satire": "Bewusste Satire oder Parodie.",
+      "no_claim": "Keine sachliche Aussage."
+    }
+  },
+  "pricing": {
+    "title": "Preise",
+    "free": { "name": "Frei", "price": "€0", "features": ["10 Prüfungen pro Tag", "1 Ermittler:in + 1 Richter", "Web-Urteil + Verlauf"] },
+    "byok": { "name": "Eigener Schlüssel", "price": "Frei", "features": ["OpenAI / Anthropic / Mistral / OpenRouter verbinden", "Standardmäßig 3 Ermittler:innen", "Es gelten die Limits deines Anbieters"] },
+    "plus": { "name": "Alethea Plus", "price": "€5 / Monat", "yearly": "oder €45 / Jahr", "features": ["5 unabhängige Ermittler:innen", "Starkes Richter-Modell", "Prioritäre Warteschlange", "Höhere Rate-Limits", "Quellen-Präferenzen", "Exportierbare Urteils-PDFs"], "cta": "Plus-Abo starten" }
+  },
+  "common": {
+    "loading": "Lädt…",
+    "error": "Etwas ist schiefgelaufen",
+    "retry": "Erneut versuchen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Entfernen",
+    "back": "Zurück",
+    "skipToContent": "Zum Hauptinhalt springen",
+    "themeLabel": "Design",
+    "theme": { "system": "System", "light": "Hell", "dark": "Dunkel" },
+    "language": "Sprache"
+  },
+  "errors": {
+    "notFound": { "title": "Wir konnten diese Seite nicht finden", "body": "Wenn du über einen Link hierher kamst, ist er vielleicht veraltet." },
+    "checkNotFound": { "title": "Prüfung nicht gefunden", "body": "Entweder ist die ID falsch, oder die Prüfung gehört einer angemeldeten Person." }
+  }
+}
