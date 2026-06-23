@@ -377,13 +377,32 @@ This phase has its OWN design + cost-architecture workflows. Done when: visible 
 - Cleanly disabled (503 + hidden buttons) when Stripe envs are unset
 - **Done when:** test card upgrades a user to Plus and rate limit reflects the new plan. ← still pending real Stripe keys (human TODO)
 
-### Phase 6 — Mobile (Expo) (1-2 weeks)
+### Phase 6 — Mobile (Expo) + pipeline-hardening quick wins ✅ SCAFFOLDED
 
-- Expo Router app under `apps/mobile`, sharing `packages/shared-types`
-- Native share extension on iOS, share intent on Android: "Share to Alethea" from any post → opens with URL pre-filled
-- Auth + BYOK + check + result + history screens
-- Optional push notifications on long checks
-- **Done when:** TestFlight build runs the full share → check → verdict flow; internal Android track does the same.
+- `apps/mobile/` — Expo Router app + dark theme matching the web tokens
+- 5 screens: Home (paste/check + share-intent pickup), `check/[id]` (poll
+  the verdict), History, Login, Settings (GDPR delete is wired)
+- `lib/api.ts` uses `X-Session-Token` + `X-CSRF-Token` instead of cookies
+  (RN cookie handling is fragile on iOS) — the API needs a parallel
+  `auth.OptionalToken` path to match; tracked in `apps/mobile/README.md`
+- `eas.json` profiles for development / preview / production
+- iOS + Android share-intent activation rules in `app.json`
+- `packages/shared-types/` is now real — canonical `Verdict`, `CheckRow`,
+  `JudgeOutput`, `EconomicsSnapshot`, etc. Mobile imports it; web still
+  has a copy for now (switch in a follow-up).
+- Phase A pipeline-hardening wins landed:
+  - **M12** — refuse-list short-circuit. Screener now classifies inputs
+    into `out_of_scope` categories (opinion, prediction, personal
+    experience, private individual, religion/ideology, humor); pipeline
+    skips retrieval + investigators and returns a labeled refusal.
+  - **M13** — date-aware retrieval. Screener system prompt now includes
+    the current ISO date; the model resolves "today"/"yesterday"/"this
+    year" into absolute references before retrieval.
+- Remaining Phase A pipeline items (M2 eval harness, M16 two-pass
+  extraction, M22 NLI citation grounding) are scoped in
+  `docs/PIPELINE_HARDENING_TODO.md`.
+- **Done when:** Expo prebuild succeeds (human TODO — needs `eas init`),
+  TestFlight build runs the full share → check → verdict flow.
 
 ### Phase 7 — Deploy (2-3 days)
 

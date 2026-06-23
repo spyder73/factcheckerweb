@@ -36,6 +36,11 @@ type ScreenerHint struct {
 	NormalizedText string
 	Difficulty     string
 	UncertaintyQs  []string // optional follow-up questions investigators can use
+	// OutOfScope, when non-empty, marks the claim as something we should
+	// refuse to fact-check rather than spend pipeline budget on. See
+	// coerceOutOfScope in screener.go for the allowed category strings.
+	// Phase A M12 (refuse list).
+	OutOfScope string
 }
 
 // InvestigatorReport is what one investigator returns.

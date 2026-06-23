@@ -399,6 +399,29 @@ func (p *Pipeline) processClaim(
 		TokensIn: screenerUsage.InputTokens, TokensOut: screenerUsage.OutputTokens, CostMicros: screenerUsage.CostMicros,
 	})
 
+	// M12 (Phase A) — refuse-list short-circuit. If the screener flagged the
+	// claim as out of scope (opinion / prediction / personal experience /
+	// private individual / religion / humor), skip retrieval + investigators
+	// entirely and return a clearly-labeled refusal. Saves money + avoids
+	// pretending we can fact-check things we can't.
+	if hint.OutOfScope != "" {
+		msg := OutOfScopeMessage[hint.OutOfScope]
+		if msg == "" {
+			msg = "This input is not a verifiable factual claim about the external world."
+		}
+		emit("claim_done", 95, "out of scope", map[string]any{"out_of_scope": hint.OutOfScope})
+		return ClaimResult{
+			Claim: c,
+			Final: JudgeOutput{
+				Verdict:    models.VerdictNoClaim,
+				Confidence: 1.0, // we're certain that this CAN'T be fact-checked, even if we can't say what's true about it
+				Summary:    msg,
+				Reasoning:  "Screener classified as out-of-scope category: " + hint.OutOfScope + ".",
+			},
+			SkepticalFallback: false,
+		}
+	}
+
 	// --- retrieval ---
 	emit("retrieval", 45, "gathering sources", nil)
 	pool, err := runRetrieval(ctx, p.deps.Search, hint, p.deps.MaxQueriesPerClaim, p.deps.HitsPerQuery)

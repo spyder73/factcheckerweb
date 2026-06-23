@@ -1,0 +1,20 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Native build outputs
+ios/Pods/
+android/.gradle/
+android/app/build/
+android/build/
+*.xcworkspace/xcuserdata/
+
+# EAS
+.eas/
+
+# Logs
+*.log
+
+# OS noise
+.DS_Store
