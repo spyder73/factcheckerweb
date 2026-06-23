@@ -74,12 +74,20 @@ func NewProvider(config Config) (Provider, error) {
 	}
 }
 
-// NewDefaultProvider picks the first provider whose API key is in the
-// environment. Order: Mistral (working), then the stubs (returns error
-// when called because they're not implemented yet — but at least lets
-// future provider rollout be additive).
+// NewDefaultProvider picks the provider in this priority order:
+//   1. AI_PROVIDER env var if set — caller's explicit choice wins
+//   2. First provider whose API key env var is present (Mistral, OpenAI,
+//      Anthropic, OpenRouter)
+//
+// Earlier code went straight to step 2, silently ignoring AI_PROVIDER
+// when an older provider's key was also in .env — confusing if the user
+// kept MISTRAL_API_KEY around but flipped AI_PROVIDER=openrouter.
 func NewDefaultProvider() (Provider, error) {
-	log.Printf("[AI Factory] Auto-detecting provider from environment...")
+	if explicit := os.Getenv("AI_PROVIDER"); explicit != "" {
+		log.Printf("[AI Factory] AI_PROVIDER=%s — using explicit choice", explicit)
+		return NewProvider(Config{Provider: explicit})
+	}
+	log.Printf("[AI Factory] AI_PROVIDER not set — auto-detecting from API-key envs")
 	for _, env := range []struct {
 		envVar   string
 		provider string
@@ -94,5 +102,5 @@ func NewDefaultProvider() (Provider, error) {
 			return NewProvider(Config{Provider: env.provider, APIKey: key})
 		}
 	}
-	return nil, fmt.Errorf("no AI provider configured. Set one of MISTRAL_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY")
+	return nil, fmt.Errorf("no AI provider configured. Set AI_PROVIDER + the matching key, e.g. AI_PROVIDER=openrouter + OPENROUTER_API_KEY")
 }
