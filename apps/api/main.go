@@ -23,6 +23,7 @@ import (
 	"alethea/api/services/ai"
 	"alethea/api/services/byokresolver"
 	"alethea/api/services/factcheck"
+	"alethea/api/services/factcheck/budget"
 	"alethea/api/services/factcheck/cache"
 	"alethea/api/services/factcheck/checkstream"
 	"alethea/api/services/search"
@@ -148,7 +149,8 @@ func main() {
 		MaxMediaItems:    cfg.MaxMediaItems,
 		MediaConcurrency: cfg.MediaConcurrency,
 	})
-	checkH := handlers.NewCheckV2(pool, pipeline, hub)
+	caps := budget.DefaultCaps()
+	checkH := handlers.NewCheckV2(pool, pipeline, hub, caps)
 	byokH := handlers.NewBYOKKeys(pool, vault)
 	sourcesH := handlers.NewSources(pool, sourceReg)
 	journalistH := handlers.NewJournalist(pool, sourceReg)

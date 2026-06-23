@@ -13,6 +13,7 @@ import (
 	"alethea/api/auth"
 	"alethea/api/httpx"
 	"alethea/api/services/factcheck"
+	"alethea/api/services/factcheck/budget"
 	"alethea/api/services/factcheck/checkstream"
 	"alethea/api/services/factcheck/persist"
 
@@ -28,10 +29,11 @@ type CheckV2 struct {
 	DB       *pgxpool.Pool
 	Pipeline *factcheck.Pipeline
 	Hub      *checkstream.Hub
+	Caps     budget.Caps
 }
 
-func NewCheckV2(db *pgxpool.Pool, p *factcheck.Pipeline, hub *checkstream.Hub) *CheckV2 {
-	return &CheckV2{DB: db, Pipeline: p, Hub: hub}
+func NewCheckV2(db *pgxpool.Pool, p *factcheck.Pipeline, hub *checkstream.Hub, caps budget.Caps) *CheckV2 {
+	return &CheckV2{DB: db, Pipeline: p, Hub: hub, Caps: caps}
 }
 
 type startReq struct {
@@ -75,6 +77,24 @@ func (h *CheckV2) Start(w http.ResponseWriter, r *http.Request) {
 		userID = &uid
 	}
 	fanoutN := factcheck.FanoutFor(plan)
+
+	// M4 (Phase A): per-user daily $ cap + global platform circuit-breaker
+	// BEFORE we burn any model calls. Cheaper to short-circuit here than
+	// to discover mid-pipeline that the user is broke.
+	if err := budget.PreCheck(r.Context(), h.DB, h.Caps, userID, plan); err != nil {
+		if errors.Is(err, budget.ErrUserOverBudget) {
+			writeJSONErr(w, http.StatusPaymentRequired, "daily_budget_exceeded",
+				"You've reached your daily spending cap for fact-checks. Upgrade your plan or wait until tomorrow.")
+			return
+		}
+		if errors.Is(err, budget.ErrPlatformOverBudget) {
+			writeJSONErr(w, http.StatusServiceUnavailable, "platform_budget_exceeded",
+				"Alethea is over today's platform-wide budget cap (cost circuit-breaker). Try again later.")
+			return
+		}
+		slog.Error("budget pre-check failed", "err", err)
+		// Don't block on a budget-system error — fail-open with a log.
+	}
 
 	// New check row.
 	checkID, err := persist.NewCheck(r.Context(), h.DB, userID, nil, body.URL, body.Caption, plan, fanoutN)
