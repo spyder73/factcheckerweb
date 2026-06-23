@@ -21,6 +21,7 @@ import (
 	"alethea/api/ratelimit"
 	"alethea/api/services"
 	"alethea/api/services/ai"
+	"alethea/api/services/billing"
 	"alethea/api/services/byokresolver"
 	"alethea/api/services/factcheck"
 	"alethea/api/services/factcheck/budget"
@@ -155,6 +156,24 @@ func main() {
 	sourcesH := handlers.NewSources(pool, sourceReg)
 	journalistH := handlers.NewJournalist(pool, sourceReg)
 
+	// Billing — nil unless STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET + price set.
+	billingSvc := billing.NewService(billing.Config{
+		SecretKey:     cfg.StripeSecretKey,
+		WebhookSecret: cfg.StripeWebhookSecret,
+		PriceMonthly:  cfg.StripePricePlusMonthly,
+		PriceYearly:   cfg.StripePricePlusYearly,
+		SuccessURL:    cfg.BillingSuccessURL,
+		CancelURL:     cfg.BillingCancelURL,
+	}, pool)
+	if billingSvc != nil {
+		slog.Info("billing ready (Stripe)")
+	} else {
+		slog.Warn("billing disabled — set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET + STRIPE_PRICE_PLUS_MONTHLY to enable Plus tier")
+	}
+	billingH := handlers.NewBilling(pool, billingSvc)
+	economicsH := handlers.NewEconomics(pool)
+	accountH := handlers.NewAccount(pool)
+
 	// Legacy single-shot handler kept ONLY for /health; the /api/check
 	// endpoints are now backed by the new pipeline.
 	legacyH := handlers.NewHandler(nil)
@@ -224,6 +243,21 @@ func main() {
 	r.With(auth.Required(pool), limiter.Middleware("/api/me/journalist")).Delete("/api/me/journalist-application", journalistH.Withdraw)
 	r.With(auth.Required(pool), limiter.Middleware("/api/admin/journalist")).Get("/api/admin/journalist-applications", journalistH.AdminList)
 	r.With(auth.Required(pool), limiter.Middleware("/api/admin/journalist")).Post("/api/admin/journalist-applications/{id}/decide", journalistH.AdminDecide)
+
+	// Billing — Plus tier subscriptions via Stripe Checkout + Customer Portal.
+	// The /api/billing/webhook route is unauthenticated and Stripe-signature-
+	// verified inside the handler. CSRF middleware skips unauth requests, so
+	// no special bypass is needed.
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/billing")).Post("/api/me/billing/checkout", billingH.Checkout)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/billing")).Post("/api/me/billing/portal", billingH.Portal)
+	r.With(limiter.Middleware("/api/billing/webhook")).Post("/api/billing/webhook", billingH.Webhook)
+
+	// Public economics ticker (replaces the static fallback in EconomicsTicker.tsx).
+	r.With(limiter.Middleware("/api/economics")).Get("/api/economics", economicsH.Get)
+
+	// GDPR Art. 15 + 17 — data export and account erasure. M8 from Phase A.
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/data")).Get("/api/me/data-export", accountH.Export)
+	r.With(auth.Required(pool), limiter.Middleware("/api/me/data")).Post("/api/me/data-delete", accountH.Delete)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

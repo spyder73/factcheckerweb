@@ -48,6 +48,16 @@ type Config struct {
 	// Raise on a paid plan / OpenRouter; rate-limit retry is in the client either way.
 	MaxMediaItems    int // default 6 — max images analyzed per check
 	MediaConcurrency int // default 2 — concurrent vision calls
+
+	// Billing (Stripe). All-or-nothing: if SecretKey or WebhookSecret is
+	// missing, the billing.Service is nil and /api/me/billing/* returns 503.
+	StripeSecretKey         string
+	StripeWebhookSecret     string
+	StripePricePlusMonthly  string
+	StripePricePlusYearly   string
+	BillingSuccessURL       string // e.g. https://alethea.app/account?upgraded=1
+	BillingCancelURL        string // e.g. https://alethea.app/pricing?canceled=1
+	DonateURL               string // optional — external Ko-fi / OpenCollective link
 }
 
 // Global instance set by Load.
@@ -73,6 +83,14 @@ func Load() error {
 		BYOKMasterKey:       getEnv("BYOK_MASTER_KEY", ""),
 		MaxMediaItems:       getEnvInt("MAX_MEDIA_ITEMS", 6),
 		MediaConcurrency:    getEnvInt("MEDIA_CONCURRENCY", 2),
+
+		StripeSecretKey:        getEnv("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:    getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		StripePricePlusMonthly: getEnv("STRIPE_PRICE_PLUS_MONTHLY", ""),
+		StripePricePlusYearly:  getEnv("STRIPE_PRICE_PLUS_YEARLY", ""),
+		BillingSuccessURL:      getEnv("BILLING_SUCCESS_URL", getEnv("BASE_URL", "http://localhost:3000")+"/account?upgraded=1"),
+		BillingCancelURL:       getEnv("BILLING_CANCEL_URL", getEnv("BASE_URL", "http://localhost:3000")+"/pricing?canceled=1"),
+		DonateURL:              getEnv("DONATE_URL", ""),
 	}
 
 	if App.DatabaseURL == "" {

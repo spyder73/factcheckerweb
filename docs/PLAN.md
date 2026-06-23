@@ -364,12 +364,18 @@ Scope grew significantly after Phase A. Three workstreams:
 
 This phase has its OWN design + cost-architecture workflows. Done when: visible design polish lands, verdict copy rewritten, cost infra circuit-breaks before runaway calls.
 
-### Phase 5 — Billing (3-4 days)
+### Phase 5 — Billing ✅ DONE
 
-- Stripe Checkout + Customer Portal
-- Webhooks → `plan_events` → `users.plan`
-- Donations page → Open Collective + GitHub Sponsors
-- **Done when:** test card upgrades a user to Plus and rate limit reflects the new plan.
+- Stripe Checkout subscription mode + Customer Portal (PCI scope: SAQ-A; no card data ever touches Alethea)
+- `billing.Service` wrapping stripe-go/v79 — config-driven, nil if STRIPE_SECRET_KEY missing
+- Webhook signature verification + idempotent processing via `plan_events.stripe_event_id UNIQUE`
+- Event handlers: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed` (logs only — no immediate downgrade)
+- `/api/me/billing/checkout` + `/api/me/billing/portal` + `/api/billing/webhook` (CSRF naturally skipped for unauth requests)
+- `/api/economics` aggregating `SUM(checks.total_cost_micros)` + check count + BYOK% — `EconomicsTicker` lights up automatically
+- `/api/me/data-export` (GDPR Art. 15) + `/api/me/data-delete` with `"DELETE"` confirmation (Art. 17) — M8 from Phase A
+- Pricing page wired: Plus CTA → Stripe Checkout (monthly/yearly), Plus users get "Manage subscription" → Portal, optional `VITE_DONATE_URL` renders external donate button
+- Cleanly disabled (503 + hidden buttons) when Stripe envs are unset
+- **Done when:** test card upgrades a user to Plus and rate limit reflects the new plan. ← still pending real Stripe keys (human TODO)
 
 ### Phase 6 — Mobile (Expo) (1-2 weeks)
 

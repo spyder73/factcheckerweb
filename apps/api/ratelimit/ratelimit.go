@@ -75,6 +75,15 @@ func Default() Limits {
 		"/api/me/journalist":        {"free": {Max: 10, Window: time.Minute}},
 		"/api/admin/sources":        {"admin": {Max: 60, Window: time.Minute}},
 		"/api/admin/journalist":     {"admin": {Max: 60, Window: time.Minute}},
+
+		// Phase 5 — billing + GDPR data-rights + economics ticker.
+		// Stripe webhook is hit only by Stripe; cap is generous but bounded
+		// to keep a stuck retry loop from drowning the API.
+		"/api/me/billing":       {"free": {Max: 10, Window: time.Minute}},
+		"/api/billing/webhook":  {"anon": {Max: 200, Window: time.Minute}},
+		"/api/economics":        {"anon": {Max: 60, Window: time.Minute}, "free": {Max: 120, Window: time.Minute}},
+		// Data export/erasure are dangerous + expensive; cap hard.
+		"/api/me/data":          {"free": {Max: 3, Window: time.Hour}},
 	}
 }
 
