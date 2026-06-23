@@ -142,39 +142,54 @@ h1, h2, h3, h4 {
 
 body {
   background-image:
-    /* faint cobalt glow, top-right corner */
+    /* warm complementary glow, bottom-left corner */
     radial-gradient(
-      ellipse 1100px 700px at 85% -10%,
-      rgb(var(--color-accent) / var(--bg-glow-alpha, 0.06)) 0%,
+      ellipse 900px 700px at 10% 110%,
+      rgb(var(--color-bg-warm-r) var(--color-bg-warm-g) var(--color-bg-warm-b) / var(--bg-warm-alpha, 0.10)) 0%,
       transparent 60%
+    ),
+    /* cobalt glow, top-right corner */
+    radial-gradient(
+      ellipse 1200px 800px at 90% -10%,
+      rgb(var(--color-accent) / var(--bg-glow-alpha, 0.18)) 0%,
+      transparent 55%
     ),
     /* dotted grid */
     radial-gradient(
       circle at center,
-      rgb(var(--color-border-subtle) / var(--bg-dot-alpha, 0.6)) 1px,
-      transparent 1.4px
+      rgb(var(--color-fg-muted) / var(--bg-dot-alpha, 0.18)) 1.1px,
+      transparent 1.6px
     );
-  background-size: auto, 28px 28px;
-  background-attachment: fixed, fixed;
-  background-repeat: no-repeat, repeat;
+  background-size: auto, auto, 26px 26px;
+  background-attachment: fixed, fixed, fixed;
+  background-repeat: no-repeat, no-repeat, repeat;
 }
 
-/* Dark mode: dots a bit more visible against the warm-black canvas, glow softer. */
+/* Dark mode: visible-but-restrained accent atmosphere */
 [data-theme="dark"] {
-  --bg-dot-alpha: 0.5;
-  --bg-glow-alpha: 0.07;
+  --bg-dot-alpha: 0.22;
+  --bg-glow-alpha: 0.22;
+  --bg-warm-alpha: 0.10;
+  /* warm complement (amber/orange) for the bottom-left glow */
+  --color-bg-warm-r: 251;
+  --color-bg-warm-g: 146;
+  --color-bg-warm-b: 60;
 }
-/* Light mode: dots subtler, glow barely there. */
+/* Light mode: gentler but still present */
 [data-theme="light"], :root:not([data-theme="dark"]) {
-  --bg-dot-alpha: 0.7;
-  --bg-glow-alpha: 0.045;
+  --bg-dot-alpha: 0.40;
+  --bg-glow-alpha: 0.08;
+  --bg-warm-alpha: 0.05;
+  --color-bg-warm-r: 251;
+  --color-bg-warm-g: 191;
+  --color-bg-warm-b: 36;
 }
 
 .hairline-grid {
   background-image:
-    linear-gradient(to right, rgb(var(--color-border-subtle) / 0.5) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(var(--color-border-subtle) / 0.5) 1px, transparent 1px);
-  background-size: 80px 80px;
+    linear-gradient(to right, rgb(var(--color-fg-muted) / 0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--color-fg-muted) / 0.18) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
 @media (prefers-reduced-motion: reduce) {

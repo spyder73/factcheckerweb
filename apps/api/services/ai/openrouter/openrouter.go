@@ -5,7 +5,7 @@
 // Set AI_PROVIDER=openrouter + OPENROUTER_API_KEY + (optional) OPENROUTER_MODEL
 // to switch the pool over.
 //
-// Default model: anthropic/claude-3.5-sonnet — strong reasoning + vision +
+// Default model: anthropic/claude-4.6-sonnet — strong reasoning + vision +
 // JSON mode. Override via config.Model or OPENROUTER_MODEL env.
 //
 // Headers HTTP-Referer + X-Title are OpenRouter's app-attribution mechanism
@@ -32,7 +32,7 @@ import (
 
 const (
 	defaultBaseURL = "https://openrouter.ai/api/v1"
-	defaultModel   = "anthropic/claude-3.5-sonnet"
+	defaultModel   = "anthropic/claude-4.6-sonnet"
 
 	// Sent as HTTP-Referer + X-Title so OpenRouter's dashboard can attribute
 	// usage to Alethea. Both are recommended-not-required.
@@ -41,11 +41,11 @@ const (
 )
 
 type Provider struct {
-	apiKey    string
-	baseURL   string
-	model     string
+	apiKey      string
+	baseURL     string
+	model       string
 	temperature float64
-	client    *http.Client
+	client      *http.Client
 }
 
 func NewProvider(cfg types.Config) *Provider {
@@ -66,10 +66,10 @@ func NewProvider(cfg types.Config) *Provider {
 	}
 }
 
-func (p *Provider) Name() string         { return "openrouter" }
-func (p *Provider) ModelID() string      { return p.model }
+func (p *Provider) Name() string    { return "openrouter" }
+func (p *Provider) ModelID() string { return p.model }
 func (p *Provider) SupportsVision() bool {
-	// Vision is model-dependent. The defaults (Claude 3.5 Sonnet, GPT-4o,
+	// Vision is model-dependent. The defaults (Claude 4.6 Sonnet, GPT-4o,
 	// Pixtral, Gemini Flash) all support it. We say true conservatively
 	// and let the model return an error if it can't actually do images —
 	// the orchestrator captures per-image errors gracefully.
@@ -83,19 +83,19 @@ type message struct {
 	Content any    `json:"content"` // string OR []contentPart for vision
 }
 type contentPart struct {
-	Type     string             `json:"type"`
-	Text     string             `json:"text,omitempty"`
-	ImageURL *imageURLWrapper   `json:"image_url,omitempty"`
+	Type     string           `json:"type"`
+	Text     string           `json:"text,omitempty"`
+	ImageURL *imageURLWrapper `json:"image_url,omitempty"`
 }
 type imageURLWrapper struct {
 	URL string `json:"url"`
 }
 type request struct {
-	Model          string         `json:"model"`
-	Messages       []message      `json:"messages"`
-	Temperature    float64        `json:"temperature,omitempty"`
-	MaxTokens      int            `json:"max_tokens,omitempty"`
-	ResponseFormat *responseFmt   `json:"response_format,omitempty"`
+	Model          string       `json:"model"`
+	Messages       []message    `json:"messages"`
+	Temperature    float64      `json:"temperature,omitempty"`
+	MaxTokens      int          `json:"max_tokens,omitempty"`
+	ResponseFormat *responseFmt `json:"response_format,omitempty"`
 }
 type responseFmt struct {
 	Type string `json:"type"` // "json_object"
@@ -164,10 +164,10 @@ func (p *Provider) AnalyzeImage(imageData, prompt string) (string, error) {
 	}
 
 	req := request{
-		Model:    p.model,
-		Messages: []message{{Role: "user", Content: parts}},
+		Model:       p.model,
+		Messages:    []message{{Role: "user", Content: parts}},
 		Temperature: p.temperature,
-		MaxTokens: 4096,
+		MaxTokens:   4096,
 	}
 	resp, _, err := p.send(context.Background(), req)
 	if err != nil {
@@ -355,8 +355,8 @@ func estimateCostMicros(model string, in, out int) int {
 	var inPerMil, outPerMil int64
 	m := strings.ToLower(model)
 	switch {
-	case strings.Contains(m, "claude-3.5-sonnet"), strings.Contains(m, "claude-3-5-sonnet"):
-		inPerMil = 3_000_000  // $3/M
+	case strings.Contains(m, "claude-4.6-sonnet"), strings.Contains(m, "claude-4-6-sonnet"):
+		inPerMil = 3_000_000   // $3/M
 		outPerMil = 15_000_000 // $15/M
 	case strings.Contains(m, "claude") && strings.Contains(m, "opus"):
 		inPerMil = 15_000_000
