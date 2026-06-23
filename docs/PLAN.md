@@ -430,12 +430,22 @@ This phase has its OWN design + cost-architecture workflows. Done when: visible 
 - **Done when:** human pushes a real deploy and DNS resolves. Until then,
   these configs are validated locally only.
 
-### Phase 8 — Launch
+### Phase 8 — Launch docs ✅ DOCS DRAFTED
 
-- `docs/{how-it-works,trust-policy,source-policy,journalist-program,TOS,privacy,security}.md`
-- `/.well-known/security.txt`
-- App Store + Play Store submissions
-- HN Show, Reddit (r/journalism, r/skeptic, r/selfhosted), Mastodon, journalism mailing lists
+- `docs/how-it-works.md` — long-form pipeline explanation for users
+- `docs/trust-policy.md` — tier definitions + non-repudiation + corrections
+- `docs/source-policy.md` — registry criteria + challenge process
+- `docs/journalist-program.md` — application + eligibility
+- `docs/TOS.md` — **DRAFT, LEGAL REVIEW REQUIRED**
+- `docs/privacy.md` — **DRAFT, LEGAL REVIEW REQUIRED**
+- `docs/security.md` — coordinated disclosure policy
+- `docs/CONTRIBUTING.md` — what we want patches for, what we won't accept
+- `docs/CHANGELOG.md` — every phase landed, dated
+- `README.md` — polished
+- `apps/web/public/.well-known/security.txt` — landed in Phase 7
+- **Remaining human work to actually launch:** App Store + Play Store
+  submissions, HN/Reddit/Mastodon posts, lawyer review on TOS + privacy.
+  See `docs/HUMAN_TODO.md`.
 
 ### Phase 8.5 — Distribution multipliers (post-launch)
 

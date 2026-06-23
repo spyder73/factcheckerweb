@@ -1,67 +1,109 @@
 # Alethea
 
-**Open-source, evidence-based fact-checking for everyone.**
+**Open-source, evidence-based fact-checking.** Paste any social-media
+post or claim and get a verdict you can trace: every claim, every
+source, every agent vote — fully visible. Multi-agent under the hood,
+skeptical by default, transparent about its own uncertainty.
 
-Paste any social-media post (or claim) and get a traceable verdict: every claim, every source, every agent vote — fully visible. Multi-agent under the hood, skeptical by default, transparent about its own uncertainty.
-
-Status: **early development**. The current codebase is a single-agent PoC being evolved into the full product. See [`docs/PLAN.md`](docs/PLAN.md) for the build roadmap.
-
----
-
-## Monorepo layout
-
-| Path | What |
-| --- | --- |
-| `apps/api/` | Go backend (chi router, SSE streaming, Mistral provider) |
-| `apps/web/` | React + Vite + TS + Tailwind frontend |
-| `apps/mobile/` | _(Phase 6)_ Expo iOS + Android app |
-| `services/scrapers/instagram/` | Python Flask service wrapping Instaloader |
-| `packages/shared-types/` | _(Phase 1+)_ TS types generated from Go structs |
-| `infra/` | docker-compose, Caddy config, DB migrations, backup scripts |
-| `docs/` | Plan, methodology, source policy, TOS, privacy, security |
+> Alethea (ἀλήθεια) — Greek for *truth*, also the *absence of forgetting*.
 
 ---
 
-## Quickstart (dev)
+## What it does
 
-Prereqs: Docker Desktop, Go 1.21+ (only if running the API outside Docker), Node 20+ (only for web outside Docker), Python 3.12+ (only for scraper outside Docker), a Mistral API key.
+1. You paste a URL or some text.
+2. We scrape it, analyze any images, extract atomic claims.
+3. A pool of independent investigator agents researches each claim
+   against a curated source registry + live web search.
+4. A judge model synthesizes their reports into a final verdict with
+   citations, dissent, and a confidence score.
+5. You see the whole thing — sources, agent transcripts, the lot — and
+   can disagree on the evidence rather than on faith.
 
-```bash
-cp .env.example .env          # then set MISTRAL_API_KEY
-make dev                       # docker compose up — postgres, redis, api, web, scraper
+See [`docs/how-it-works.md`](docs/how-it-works.md) for the long version.
+
+## Why it's different
+
+- **Skeptical default.** When the evidence is thin, the verdict is
+  "not enough evidence," never a confident guess. A hard confidence
+  floor at 0.65 enforces this.
+- **Multi-agent.** N independent investigators see the same source
+  pool but reason separately; the judge has to acknowledge dissent
+  explicitly.
+- **Open everything.** Pipeline code, prompts, source list, and trust
+  tiers are all in this repo. Self-hostable.
+- **BYOK supported.** Bring your own Anthropic / OpenAI / Mistral /
+  OpenRouter key and route only through that provider.
+- **Refuses to fact-check the wrong things.** Opinions, predictions,
+  personal experiences, and humor get a labeled refusal instead of a
+  fabricated verdict.
+
+## Status
+
+Pre-1.0. Phases 0–8 of the build plan are complete on `main`; what
+remains is human work (Stripe live keys, App Store registration, legal
+review of `docs/TOS.md` + `docs/privacy.md`, production DNS). See
+[`docs/PLAN.md`](docs/PLAN.md) for the trajectory and
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md) for what landed when.
+
+## Quickstart (development)
+
+Requires Docker Desktop + a [Mistral][mistral] API key (or set
+`AI_PROVIDER=openrouter` and use an [OpenRouter][openrouter] key).
+
+```sh
+cp .env.example .env             # set MISTRAL_API_KEY (or OPENROUTER_API_KEY)
+make dev                         # docker compose up — postgres, redis, api, web, scraper
 ```
 
-Open <http://localhost:3000>. API at <http://localhost:8080>. Scraper at <http://localhost:5001>.
+Open <http://localhost:3000>. API at <http://localhost:8080>.
 
-Individual targets:
+Run targets individually:
 
-```bash
-make api        # go run apps/api (needs MISTRAL_API_KEY)
-make web        # vite dev server (apps/web)
-make scraper    # python services/scrapers/instagram/app.py
-make down       # stop compose
-make logs       # tail compose logs
+```sh
+make api       # go run apps/api (needs an LLM key in .env)
+make web       # vite dev server
+make scraper   # python services/scrapers/instagram
+make down      # stop everything
+make logs      # tail compose logs
 ```
 
----
+## Project layout
 
-## Methodology (what Alethea does)
+| Path                           | What |
+| ------------------------------ | ---- |
+| `apps/api/`                    | Go backend — chi router, multi-agent pipeline, Postgres, Redis, BYOK vault, Stripe billing |
+| `apps/web/`                    | React + Vite + TS + Tailwind frontend |
+| `apps/mobile/`                 | Expo Router (iOS + Android) — scaffolded |
+| `packages/shared-types/`       | TS types canonical across web + mobile |
+| `services/scrapers/instagram/` | Python service wrapping Instaloader |
+| `infra/`                       | docker-compose (dev + prod), Caddyfile, systemd units, backup script |
+| `docs/`                        | PLAN, DEPLOY, how-it-works, trust + source policies, TOS, privacy, security, contributing, changelog |
 
-1. **Scrape** the linked post (Instagram via the Python service; Twitter/X, TikTok, YouTube, Facebook via the generic meta-tag scraper; arbitrary HTTPS allowed via SSRF-guarded fetch).
-2. **Image analysis** — every attached image goes through a vision model in parallel.
-3. **Claim extraction** — a cheap model condenses everything into atomic checkable claims.
-4. **Fact evaluation** — _(Phase 2)_ N investigator agents independently research each claim with web search; a strong judge synthesizes a verdict with dissent metrics.
-5. **Skeptical fallback** — if confidence is low, the verdict is `Unverifiable`, not a guess.
-6. **Intent panel** — what the post is trying to do (sell / persuade / mock / inform), clearly labeled as interpretation.
+## Deploying it yourself
 
-Every verdict shows its full agent transcript, every cited source, and a confidence score. See [`docs/how-it-works.md`](docs/how-it-works.md) _(Phase 8)_ for the detailed explanation.
+Read [`docs/DEPLOY.md`](docs/DEPLOY.md). It walks from a cold Debian
+VPS to live HTTPS, including Stripe webhook wiring, automated
+encrypted backups, and a quarterly disaster-recovery drill.
 
----
+## Contributing
+
+[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md). Source-list improvements
+and prompt-quality patches are especially welcome.
+
+Security disclosure: `security@alethea.example` —
+[`docs/security.md`](docs/security.md).
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`](LICENSE). The curated source list and verdict
+templates are dual-licensed CC-BY-SA for editorial reuse.
 
 ---
 
-_Alethea (ἀλήθεια) — Greek for truth, also the absence of forgetting._
+Built by a small team and a lot of independent agents. If a verdict on
+the live site looks wrong, file an issue with the verdict ID — we read
+every report.
+
+[mistral]: https://console.mistral.ai/
+[openrouter]: https://openrouter.ai/
