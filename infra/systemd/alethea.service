@@ -1,0 +1,33 @@
+# /etc/systemd/system/alethea.service
+#
+# Boots the Alethea docker-compose stack on system start. Drop this file at
+# the path above on the production VPS, then:
+#   systemctl daemon-reload
+#   systemctl enable --now alethea.service
+#
+# Logs:  journalctl -u alethea -f
+# Stop:  systemctl stop alethea
+# Restart after an image rebuild:  systemctl restart alethea
+
+[Unit]
+Description=Alethea fact-checker (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/alethea
+EnvironmentFile=/etc/alethea/.env
+
+ExecStartPre=/usr/bin/docker compose -f infra/docker-compose.prod.yml --env-file /etc/alethea/.env pull
+ExecStart=/usr/bin/docker compose -f infra/docker-compose.prod.yml --env-file /etc/alethea/.env up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f infra/docker-compose.prod.yml --env-file /etc/alethea/.env down
+
+TimeoutStartSec=300
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

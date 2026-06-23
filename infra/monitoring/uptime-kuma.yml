@@ -1,0 +1,45 @@
+# Optional: run Uptime Kuma on the SAME box as Alethea (lightweight, ~80MB).
+# If you'd rather run monitoring off-box, point a hosted Kuma / Better Stack
+# / Pingdom at https://YOUR-DOMAIN/health instead.
+#
+# This compose file deliberately does NOT merge into docker-compose.prod.yml
+# because monitoring should keep working even if the main stack is down for
+# upgrades. Run with its own `name:` and a separate `--env-file`.
+#
+# Usage:
+#   docker compose -f infra/monitoring/uptime-kuma.yml up -d
+# Then visit https://kuma.YOUR-DOMAIN (set up DNS + a separate Caddy block).
+
+name: alethea-monitoring
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: always
+    ports:
+      - "127.0.0.1:3001:3001"  # only reachable through Caddy
+    volumes:
+      - kuma-data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  kuma-data:
+    driver: local
+
+# Targets to add inside Kuma after the UI is up:
+#   - https://YOUR-DOMAIN/health  (every 60s, status code 200)
+#   - https://YOUR-DOMAIN/version (every 5 min)
+#   - tcp postgres:5432 from inside the alethea network (use Kuma's "Push"
+#     monitor type with a tiny healthcheck script in cron if you want
+#     internal visibility)
+#   - https://api.stripe.com/v1/account with your test key as a sanity check
+#     that Stripe integration is unbroken
+#
+# Notification channels — wire AT LEAST ONE:
+#   - Telegram bot DM
+#   - Email via Resend / Postmark (NOT Gmail SMTP — they hate uptime bots)
+#   - Discord webhook

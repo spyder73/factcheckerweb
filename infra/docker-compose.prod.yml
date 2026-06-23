@@ -1,0 +1,181 @@
+# Production compose for Alethea.
+#
+# Differences from dev:
+#  - No host port mappings except Caddy (80/443). All inter-service traffic
+#    is over the docker network, never reaching the host.
+#  - Caddy fronts api + web with auto-TLS via Let's Encrypt (requires DNS
+#    pointing at this box) and adds HSTS + security headers.
+#  - No source-volume mounts — services run from baked images.
+#  - Strict restart policies; resource caps tuned for a CX22 (4GB) box.
+#  - Postgres data on a NAMED volume so an image upgrade doesn't wipe it.
+#  - All secrets read from /etc/alethea/.env (NOT from a committed file).
+#
+# Usage on the VPS:
+#   sudo mkdir -p /etc/alethea && sudo chmod 700 /etc/alethea
+#   # populate /etc/alethea/.env from .env.example, fill in real secrets
+#   cd /opt/alethea
+#   docker compose -f infra/docker-compose.prod.yml --env-file /etc/alethea/.env up -d
+
+name: alethea
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command:
+      - "redis-server"
+      - "--save"
+      - "60"
+      - "1"
+      - "--loglevel"
+      - "warning"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  scraper-instagram:
+    build:
+      context: ../services/scrapers/instagram
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      PORT: 5001
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    env_file: ${ALETHEA_ENV_FILE:-/etc/alethea/.env}
+    environment:
+      PORT: 8080
+      HOST: 0.0.0.0
+      DEBUG: "false"
+      COOKIE_SECURE: "true"
+      INSTAGRAM_SERVICE_URL: http://scraper-instagram:5001
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      # Caddy speaks to api over the docker net and forwards X-Forwarded-For.
+      # Trust the docker bridge subnet — Caddy overwrites (does not append)
+      # the inbound XFF by default, so this is safe.
+      TRUSTED_PROXIES: "127.0.0.1/32,::1/128,172.16.0.0/12"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      scraper-instagram:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      target: prod
+    restart: always
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      ALETHEA_DOMAIN: ${ALETHEA_DOMAIN}
+      ALETHEA_ADMIN_EMAIL: ${ALETHEA_ADMIN_EMAIL}
+    depends_on:
+      - api
+      - web
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

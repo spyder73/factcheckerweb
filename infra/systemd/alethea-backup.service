@@ -1,0 +1,27 @@
+# /etc/systemd/system/alethea-backup.service
+[Unit]
+Description=Nightly encrypted Postgres backup for Alethea
+After=alethea.service docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/alethea/infra/backup/backup.sh
+
+# Run as a dedicated low-privilege user that holds the SSH/age public keys
+# but has no other access. Create with:
+#   useradd --system --shell /usr/sbin/nologin --home /var/lib/alethea-backup alethea-backup
+#   usermod -aG docker alethea-backup
+User=alethea-backup
+Group=alethea-backup
+
+# Lock down what the backup script can touch.
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/tmp/alethea-backup
+PrivateTmp=true
+NoNewPrivileges=true
+
+# /etc/alethea/backup.env contains the age recipients + storage box creds.
+EnvironmentFile=/etc/alethea/backup.env

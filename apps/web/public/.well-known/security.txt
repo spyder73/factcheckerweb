@@ -1,0 +1,17 @@
+Contact: mailto:security@alethea.example
+Expires: 2027-12-31T23:59:59Z
+Preferred-Languages: en, de
+Canonical: https://alethea.example/.well-known/security.txt
+Policy: https://alethea.example/security
+Acknowledgments: https://alethea.example/security#acknowledgments
+
+# We respond within 72 hours to coordinated disclosure of:
+# - Auth or session bypass
+# - SSRF, SQLi, XSS
+# - BYOK key extraction or vault compromise
+# - Stripe webhook bypass / signature forgery
+# - Cross-tenant data leakage on multi-user endpoints
+# - Anything that lets you read someone else's checks or BYOK metadata
+# Please do not test against the production instance with high-volume
+# scanners — we share infrastructure costs with donations. A single
+# proof-of-concept request is enough.

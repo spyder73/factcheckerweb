@@ -404,14 +404,31 @@ This phase has its OWN design + cost-architecture workflows. Done when: visible 
 - **Done when:** Expo prebuild succeeds (human TODO — needs `eas init`),
   TestFlight build runs the full share → check → verdict flow.
 
-### Phase 7 — Deploy (2-3 days)
+### Phase 7 — Deploy (configs only, no actual deploy) ✅ CONFIGURED
 
-- Hetzner CX22+ (4GB) for v1, CCX13 (8GB) once Plus is active
-- `Caddyfile` reverse-proxies api/web with auto-TLS
-- `docker compose up -d` as systemd unit
-- Cron: nightly encrypted `pg_dump` → Storage Box
-- Uptime Kuma → Telegram alerts
-- **Done when:** `alethea.<domain>` serves, TLS A grade, monitoring fires test alert.
+- `infra/docker-compose.prod.yml` — no host ports except Caddy; resource
+  caps tuned for CX22; named volumes for Postgres/Redis/Caddy data;
+  json-file logging with size rotation
+- `infra/Caddyfile` — auto-TLS, HSTS preload, X-Content-Type-Options,
+  Permissions-Policy, COOP, CSP allowing Stripe checkout; HTTP/3; www→
+  apex redirect; access logs JSON
+- `infra/systemd/alethea.service` — boots the compose stack on system
+  start; daemon-reload + enable --now
+- `infra/systemd/alethea-backup.{service,timer}` — nightly 03:17 UTC
+  encrypted pg_dump
+- `infra/backup/backup.sh` — pg_dump → age-encrypt → rsync/s3 to off-host;
+  least-privilege design (no delete permission — rotation lives at the
+  destination per `infra/backup/RETENTION.md`)
+- `infra/monitoring/uptime-kuma.yml` — optional on-box Kuma in its own
+  compose project so monitoring survives stack restarts
+- `docs/DEPLOY.md` — full runbook from cold VPS to live site, including
+  Stripe webhook setup + DR dry-run procedure
+- M3 (Phase A) — `00014_corrections_and_retention.sql` migration adds
+  `verdicts.superseded_by` chain (with reason + timestamp) and
+  `checks.expires_at` for the 24h anonymous-check retention window
+- `apps/web/public/.well-known/security.txt` — disclosure policy
+- **Done when:** human pushes a real deploy and DNS resolves. Until then,
+  these configs are validated locally only.
 
 ### Phase 8 — Launch
 

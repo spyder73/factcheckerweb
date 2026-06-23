@@ -1,0 +1,90 @@
+# Caddy production config for Alethea.
+#
+# Set ALETHEA_DOMAIN and ALETHEA_ADMIN_EMAIL in /etc/alethea/.env. Caddy
+# will provision Let's Encrypt TLS certificates automatically on first run.
+# If DNS isn't pointed at the box yet, certificate provisioning will fail —
+# fix DNS, then `docker compose restart caddy`.
+
+{
+	email {$ALETHEA_ADMIN_EMAIL}
+	# Use ZeroSSL as fallback if Let's Encrypt is rate-limiting.
+	# acme_ca https://acme.zerossl.com/v2/DV90
+	servers {
+		# Pull client IP from the proxy chain (we're the edge — none — but
+		# this makes Caddy logs cleaner if we ever add Cloudflare/Fastly).
+		trusted_proxies static private_ranges
+	}
+}
+
+{$ALETHEA_DOMAIN} {
+	encode zstd gzip
+
+	# Tight security headers — score A+ on observatory.mozilla.org.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "interest-cohort=(), browsing-topics=(), camera=(), microphone=(), geolocation=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Verdict pages are JSON-LD enriched; tighten CSP step-by-step in
+		# follow-ups. This default-src baseline is permissive enough for
+		# Vite-built bundles + Stripe Checkout redirects.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; font-src 'self' data:; base-uri 'self'; form-action 'self' https://checkout.stripe.com"
+		# Remove the Server header — no point announcing the brand.
+		-Server
+	}
+
+	# Public well-known endpoints (security.txt, robots, etc.) served from
+	# the web bundle. No reverse-proxy needed.
+	@wellKnown path /.well-known/*
+	handle @wellKnown {
+		reverse_proxy web:3000
+	}
+
+	# Stripe webhook — the raw request body MUST reach the API verbatim
+	# (signature is computed over the unmodified bytes). Caddy doesn't
+	# rewrite bodies by default, but keep this matcher first so any future
+	# rewrite rules can't accidentally apply.
+	@stripeWebhook path /api/billing/webhook
+	handle @stripeWebhook {
+		reverse_proxy api:8080 {
+			header_up Host {host}
+			transport http {
+				# Stripe events fit comfortably under 1 MiB; the API also caps
+				# them. Allow up to 10s for downstream to ack.
+				response_header_timeout 10s
+			}
+		}
+	}
+
+	# API: /auth/*, /api/*, /health, /version
+	@api path /auth/* /api/* /health /version
+	handle @api {
+		reverse_proxy api:8080 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			# Caddy OVERWRITES X-Forwarded-For (does not append) by default.
+			# Combined with TRUSTED_PROXIES in the api env, this is safe
+			# against client-supplied XFF spoofing.
+		}
+	}
+
+	# Everything else → static web (Vite-built SPA served by nginx-light in
+	# the web image's prod target).
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Access log to stdout — docker logging driver handles rotation.
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# Redirect www → apex.
+www.{$ALETHEA_DOMAIN} {
+	redir https://{$ALETHEA_DOMAIN}{uri} permanent
+}

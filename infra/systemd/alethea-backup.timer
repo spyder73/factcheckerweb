@@ -1,0 +1,17 @@
+# /etc/systemd/system/alethea-backup.timer
+#
+# Runs the backup nightly at 03:17 UTC (off the hour to avoid the global
+# "everything fires at 03:00" cron stampede). Skipped runs are picked up
+# at next boot via Persistent=true.
+
+[Unit]
+Description=Nightly Alethea backup timer
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+Unit=alethea-backup.service
+
+[Install]
+WantedBy=timers.target
