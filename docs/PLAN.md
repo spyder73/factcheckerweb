@@ -321,12 +321,48 @@ Done-when criteria met:
 - Both themes work + persist + survive hard reload
 - `npm run build` + `npm run lint` (with `--max-warnings 0`) both clean
 
-### Phase 4.5 — Translation polish + mobile-menu polish + permanent demo permalinks
+### Phase A — Independent 5-agent review ✅
 
-- Real DE/ES/FR translation pass (currently DE done, ES+FR are EN stubs)
-- A few hardcoded EN strings inside check/* components moved to i18n
-- 3-4 permanent demo permalinks for sample chips on /check
-- "What's missing" list from the UX review's LOW findings
+Five parallel Opus agents (skeptical journalist, misinformation researcher, vulnerable-pop UX designer, privacy + surveillance researcher, cost + scaling engineer) reviewed the IDEA and architecture, not just the code. Full reports + synthesis in [`INDEPENDENT_REVIEW.md`](INDEPENDENT_REVIEW.md); scannable categorised findings in [`PHASE_A_FINDINGS.md`](PHASE_A_FINDINGS.md).
+
+**Three findings serious enough to pause and rethink:**
+1. The word "verified" is dishonest until a benchmark exists. Reposition as "evidence triage" until earned, OR commit to the multi-year arc: benchmark, named editorial board, IFCN signatory status.
+2. Privacy posture is incompatible with the journalist persona. Either fix retention + Tor support + scraper IP-leakage before recruiting journalists, or exclude them from launch.
+3. Unit economics kill the project before methodology questions matter. ONE viral event = $20k-80k afternoon. Phase 4.5 cost infrastructure is not optional and not parallelizable with launch.
+
+**Synthesis recommendation:** delay public launch 4-8 weeks; execute Phase 4.5 expansion + human-TODO items in parallel; treat the benchmark as the gating artifact for every verdict-quality claim.
+
+Phase plan re-prioritized below to weave in the 24 MUST-FIX-BEFORE-PUBLIC-LAUNCH items.
+
+### Phase 4.5 — Design polish + verdict copy + cost infrastructure (EXPANDED from original)
+
+Scope grew significantly after Phase A. Three workstreams:
+
+**A. Design polish (original):**
+- Animated atmospheric background (mesh-gradient, no aurora — keeps the Clinical-modern discipline)
+- Custom SVG pipeline diagram on Landing + /how-it-works (NOT mermaid — uses design tokens)
+- Trust-strip count-up animation on scroll into view (DONE in this commit)
+- View Transitions API page fades
+- Hero character-stagger fade-in
+- Verdict-ring narrative-tier halo
+- Refined hover/focus states
+
+**B. Verdict copy + UX honesty pass (Phase A M-items):**
+- M1: Drop "verified" from user-visible surface. Action-verb labels on uncertain verdicts ("Don't share this", "Read both halves")
+- M17: Confidence bands (high/medium/low), no numeric scores
+- M19: Every error state gets actionable copy
+- M20: ClaimReview JSON-LD on verdict pages
+- M23: SSE timeline OFF by default, opt-in for power users, padded events
+- M11: `noindex,nofollow` on verdict pages by default
+
+**C. Cost infrastructure (Phase A M-items):**
+- M4: Per-user daily $ budget + global circuit breaker
+- M5: Anthropic / OpenRouter prompt caching on shared source pool
+- M6: Semantic cache (embedding + ANN + 0.92 cosine) on top of exact cache
+- M7: Hard cap images per check (4), per-agent `max_tokens`, per-check token circuit breaker
+- M14: Claim-class-aware cache TTL
+
+This phase has its OWN design + cost-architecture workflows. Done when: visible design polish lands, verdict copy rewritten, cost infra circuit-breaks before runaway calls.
 
 ### Phase 5 — Billing (3-4 days)
 

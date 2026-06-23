@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { VERDICTS_BY_LEGEND_ORDER, TIERS } from '../design/tokens'
 import { VerdictPill } from '../components/VerdictPill'
+import { PipelineDiagram } from '../components/PipelineDiagram'
 
 export default function HowItWorks() {
   const { t } = useTranslation()
@@ -10,6 +11,15 @@ export default function HowItWorks() {
       <p className="text-eyebrow uppercase text-fg-muted mb-3">METHODOLOGY</p>
       <h1 className="text-4xl lg:text-5xl font-bold mb-8">{t('howItWorks.title')}</h1>
       <p className="text-lg text-fg-subtle prose-measure mb-12">{t('howItWorks.pipeline')}</p>
+
+      <section aria-labelledby="pipeline-diagram-heading" className="border border-border-subtle rounded-lg p-6 lg:p-10 bg-bg-elevated/40 mb-16">
+        <h2 id="pipeline-diagram-heading" className="sr-only">Pipeline diagram</h2>
+        <PipelineDiagram variant="explainer" />
+        <p className="mt-8 text-sm text-fg-muted text-center">
+          <span className="hidden lg:inline">Hover any node for details.</span>
+          <span className="lg:hidden">Each stage explained below.</span>
+        </p>
+      </section>
 
       <section className="space-y-10 mb-16">
         {stages.map((s, i) => (

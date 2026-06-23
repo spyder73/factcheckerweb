@@ -3,23 +3,21 @@ import { useTranslation } from 'react-i18next'
 import { ArrowRight } from 'lucide-react'
 import { VERDICTS_BY_LEGEND_ORDER } from '../design/tokens'
 import { VerdictPill } from '../components/VerdictPill'
+import { PipelineDiagram } from '../components/PipelineDiagram'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function Landing() {
   const { t } = useTranslation()
 
-  const stages = [
-    { key: 'scrape',     label: t('landing.stages.scrape') },
-    { key: 'extract',    label: t('landing.stages.extract') },
-    { key: 'investigate', label: t('landing.stages.investigate') },
-    { key: 'judge',      label: t('landing.stages.judge') },
-    { key: 'explain',    label: t('landing.stages.explain') },
-  ]
-
+  const m1 = useCountUp(5)
+  const m2 = useCountUp(100)
+  const m3 = useCountUp(7)
+  const m4 = useCountUp(0)
   const metrics = [
-    { v: '5', l: 'investigators per check' },
-    { v: '100+', l: 'vetted outlets' },
-    { v: '7', l: 'verdict categories' },
-    { v: '0', l: 'data sold (open source)' },
+    { ref: m1.ref, display: m1.display, suffix: '', l: 'investigators per check' },
+    { ref: m2.ref, display: m2.display, suffix: '+', l: 'vetted outlets' },
+    { ref: m3.ref, display: m3.display, suffix: '', l: 'verdict categories' },
+    { ref: m4.ref, display: m4.display, suffix: '', l: 'data sold (open source)' },
   ]
 
   return (
@@ -63,12 +61,15 @@ export default function Landing() {
       </section>
 
       {/* Trust strip */}
-      <section className="border-t border-b border-border-subtle">
+      <section className="border-t border-b border-border-subtle bg-bg-elevated/40">
         <div className="mx-auto max-w-content px-4 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border-subtle">
             {metrics.map((m) => (
-              <div key={m.l} className="px-6 py-4 first:pl-0 last:pr-0">
-                <div className="tabular text-2xl font-bold text-fg-strong">{m.v}</div>
+              <div key={m.l} className="px-6 py-6 first:pl-0 last:pr-0">
+                <div className="tabular text-3xl font-bold text-fg-strong">
+                  <span ref={m.ref}>{m.display}</span>
+                  {m.suffix}
+                </div>
                 <div className="text-2xs uppercase tracking-wide text-fg-muted mt-1">{m.l}</div>
               </div>
             ))}
@@ -76,18 +77,22 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mx-auto max-w-content px-4 lg:px-8 py-20">
+      {/* How it works — pipeline diagram */}
+      <section className="mx-auto max-w-content px-4 lg:px-8 py-24">
         <p className="text-eyebrow uppercase text-fg-muted mb-3">HOW IT WORKS</p>
-        <h2 className="text-3xl lg:text-4xl font-bold mb-12 max-w-prose">Five stages, every one visible.</h2>
-        <ol className="grid gap-4 lg:grid-cols-5">
-          {stages.map((s, i) => (
-            <li key={s.key} className="border border-border-subtle rounded-md p-5">
-              <span className="mono text-2xs text-fg-muted">{(i + 1).toString().padStart(2, '0')}</span>
-              <h3 className="text-base font-semibold mt-2 mb-2">{s.label}</h3>
-            </li>
-          ))}
-        </ol>
+        <h2 className="text-3xl lg:text-4xl font-bold mb-4 max-w-prose">Eight stages, every one visible.</h2>
+        <p className="text-fg-subtle prose-measure mb-12">
+          A URL goes in, a verdict comes out — but the steps in between are the whole point.
+          Nothing is hidden; every claim, every search, every investigator vote, every cited source.
+        </p>
+        <div className="border border-border-subtle rounded-lg p-6 lg:p-10 bg-bg-elevated/40">
+          <PipelineDiagram variant="landing" />
+        </div>
+        <div className="mt-6 text-center">
+          <Link to="/how-it-works" className="text-sm text-accent hover:underline underline-offset-4">
+            Read the full methodology →
+          </Link>
+        </div>
       </section>
 
       {/* Verdict legend */}
