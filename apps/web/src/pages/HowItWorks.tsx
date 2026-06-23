@@ -12,13 +12,13 @@ export default function HowItWorks() {
       <h1 className="text-4xl lg:text-5xl font-bold mb-8">{t('howItWorks.title')}</h1>
       <p className="text-lg text-fg-subtle prose-measure mb-12">{t('howItWorks.pipeline')}</p>
 
-      <section aria-labelledby="pipeline-diagram-heading" className="border border-border-subtle rounded-lg p-6 lg:p-10 bg-bg-elevated/40 mb-16">
-        <h2 id="pipeline-diagram-heading" className="sr-only">Pipeline diagram</h2>
+      <section aria-labelledby="pipeline-diagram-heading" className="border border-border-subtle rounded-lg px-6 pt-10 pb-14 lg:px-10 lg:pt-14 lg:pb-16 bg-bg-elevated/40 mb-16">
+        <div className="flex items-baseline justify-between mb-8">
+          <h2 id="pipeline-diagram-heading" className="text-eyebrow uppercase text-fg-muted">The pipeline</h2>
+          <span className="hidden lg:inline text-2xs text-fg-subtle">Hover any node for details</span>
+          <span className="lg:hidden text-2xs text-fg-subtle">Each stage explained below</span>
+        </div>
         <PipelineDiagram variant="explainer" />
-        <p className="mt-8 text-sm text-fg-muted text-center">
-          <span className="hidden lg:inline">Hover any node for details.</span>
-          <span className="lg:hidden">Each stage explained below.</span>
-        </p>
       </section>
 
       <section className="space-y-10 mb-16">
