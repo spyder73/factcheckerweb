@@ -27,6 +27,10 @@ export default function Check() {
   const [submitErr, setSubmitErr] = useState<string | null>(null)
 
   const stream = useCheck(checkId)
+  // M23 (Phase A): pipeline timeline is OFF by default. Three reviewers
+  // independently flagged the live SSE log as "trust theatre" that
+  // accidentally cues authority. Power users can opt in.
+  const [showTimeline, setShowTimeline] = useState(false)
 
   // M11 + M20: noindex on every verdict-rendering page so screenshotted
   // badges can't be SEO-laundered, plus ClaimReview JSON-LD when a verdict
@@ -149,7 +153,25 @@ export default function Check() {
         </button>
       </div>
 
-      <PipelineLog events={stream.events} done={stream.closed} className="mb-10" />
+      {/* Quiet-by-default progress: a single line + progress ring. Power users
+          can expand to see every SSE event. */}
+      {!stream.closed && !stream.result && (
+        <div className="mb-10 flex items-center justify-between rounded-lg border border-border-subtle bg-bg-elevated px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse" aria-hidden="true" />
+            <span className="text-fg">{stream.events.length > 0 ? `${stream.events[stream.events.length - 1].message || stream.events[stream.events.length - 1].stage}…` : 'Starting…'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTimeline((v) => !v)}
+            className="text-sm text-fg-muted hover:text-fg underline-offset-4 hover:underline"
+            aria-expanded={showTimeline}
+          >
+            {showTimeline ? 'Hide details' : 'Show details'}
+          </button>
+        </div>
+      )}
+      {showTimeline && <PipelineLog events={stream.events} done={stream.closed} className="mb-10" />}
 
       {stream.error && !stream.result && (
         <div role="alert" className="rounded-md border border-verdict-false bg-verdict-false-bg p-4 text-fg space-y-2">
