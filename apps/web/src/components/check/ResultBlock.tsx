@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { AlertCircle, Database, Eye } from 'lucide-react'
-import { DURATION, EASING } from '../../design/tokens'
+import { DURATION, EASING, VERDICTS } from '../../design/tokens'
 import type { CheckDonePayload, TrustTier } from '../../types/api'
 import { VerdictRing } from './VerdictRing'
 import { DissentBars } from './DissentBars'
@@ -44,7 +44,12 @@ export function ResultBlock({ result }: Props) {
               <VerdictPill verdict={result.overall_verdict} size="lg" />
               {cached && <span className="text-xs text-fg-muted">{t('check.result.cached')}</span>}
             </div>
-            <p className="text-lg text-fg max-w-measure">{result.summary}</p>
+            {/* Action line — the highest-priority Phase A finding (M1):
+                non-expert readers see a verb-first instruction before the prose. */}
+            <p className={`text-lg font-semibold mb-3 ${VERDICTS[result.overall_verdict].textClass}`}>
+              {VERDICTS[result.overall_verdict].actionLine}
+            </p>
+            <p className="text-base text-fg-subtle max-w-measure">{result.summary}</p>
           </div>
 
           {skeptical && (

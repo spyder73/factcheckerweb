@@ -3,9 +3,9 @@
 // counts up in sync. Respects motion policy: 'none' tier shows the static
 // final value with no animation.
 
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { motion, useMotionValue, useSpring } from 'framer-motion'
 import { useEffect } from 'react'
-import { VERDICTS, DURATION, EASING, resolveMotionPolicy } from '../../design/tokens'
+import { VERDICTS, DURATION, EASING, resolveMotionPolicy, confidenceBand, BAND_LABEL } from '../../design/tokens'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import type { Verdict } from '../../types/api'
 
@@ -39,24 +39,18 @@ export function VerdictRing({
     bounce: 0,
   })
 
-  const pct = useMotionValue(policy.allowNarrative ? 0 : Math.round(confidence * 100))
-  const pctSpring = useSpring(pct, { duration: policy.allowNarrative ? DURATION.narrative * 1000 : 0, bounce: 0 })
-  const pctText = useTransform(pctSpring, (v) => `${Math.round(v)}%`)
-
   useEffect(() => {
-    if (policy.allowNarrative) {
-      offset.set(targetOffset)
-      pct.set(Math.round(confidence * 100))
-    } else {
-      offset.set(targetOffset)
-      pct.set(Math.round(confidence * 100))
-    }
-  }, [confidence, policy.allowNarrative, targetOffset, offset, pct])
+    offset.set(targetOffset)
+  }, [confidence, targetOffset, offset])
+
+  // M17: bands, not numbers. We never show "0.62" to a non-expert user.
+  const band = confidenceBand(confidence)
+  const bandLabel = BAND_LABEL[band]
 
   return (
     <div
       role="figure"
-      aria-label={`Verdict ${meta.label}, confidence ${Math.round(confidence * 100)} percent`}
+      aria-label={`Verdict ${meta.shortLabel}, ${bandLabel.toLowerCase()}`}
       className="relative inline-flex items-center justify-center"
       style={{ width: size, height: size }}
     >
@@ -76,23 +70,22 @@ export function VerdictRing({
           style={{ strokeDashoffset: springOffset }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
         <motion.div
-          className={`tabular text-5xl font-bold ${meta.textClass}`}
-          style={{ opacity: policy.allowNarrative ? undefined : 1 }}
-          initial={policy.allowNarrative ? { opacity: 0 } : false}
-          animate={policy.allowNarrative ? { opacity: 1 } : false}
+          className={`text-2xl lg:text-3xl font-bold leading-tight ${meta.textClass}`}
+          initial={policy.allowNarrative ? { opacity: 0, y: 8 } : false}
+          animate={policy.allowNarrative ? { opacity: 1, y: 0 } : false}
           transition={{ duration: DURATION.macro, delay: 0.4, ease: EASING.outQuart }}
         >
-          {pctText}
+          {meta.shortLabel}
         </motion.div>
         <motion.div
-          className={`mt-1 text-eyebrow uppercase font-medium ${meta.textClass}`}
-          initial={policy.allowNarrative ? { opacity: 0, y: 4 } : false}
-          animate={policy.allowNarrative ? { opacity: 1, y: 0 } : false}
-          transition={{ duration: DURATION.macro, delay: 0.45, ease: EASING.outQuart }}
+          className="mt-2 text-2xs uppercase tracking-wide font-medium text-fg-muted"
+          initial={policy.allowNarrative ? { opacity: 0 } : false}
+          animate={policy.allowNarrative ? { opacity: 1 } : false}
+          transition={{ duration: DURATION.macro, delay: 0.55, ease: EASING.outQuart }}
         >
-          {meta.label}
+          {bandLabel}
         </motion.div>
       </div>
     </div>

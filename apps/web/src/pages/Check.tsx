@@ -10,6 +10,7 @@ import { ResultBlock } from '../components/check/ResultBlock'
 import { useCheck } from '../hooks/useCheck'
 import { startCheck } from '../api/check'
 import { ApiException } from '../types/api'
+import { useHead, verdictToRating } from '../utils/head'
 
 // Sample URLs disabled until we have permanent, real demo permalinks
 // (example.com fails the SSRF guard and confuses users with a broken demo).
@@ -26,6 +27,25 @@ export default function Check() {
   const [submitErr, setSubmitErr] = useState<string | null>(null)
 
   const stream = useCheck(checkId)
+
+  // M11 + M20: noindex on every verdict-rendering page so screenshotted
+  // badges can't be SEO-laundered, plus ClaimReview JSON-LD when a verdict
+  // is available so the fact-check ecosystem can discover us (opt-in to
+  // indexing comes later via a per-check publish flag).
+  const firstClaim = stream.result?.claims[0]
+  useHead({
+    noindex: true,
+    claimReview: stream.result && firstClaim
+      ? {
+          claimReviewed: firstClaim.claim.raw_text,
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          reviewer: 'Alethea',
+          reviewBody: firstClaim.final.summary,
+          ratingValue: verdictToRating(firstClaim.final.verdict).value,
+          alternateName: verdictToRating(firstClaim.final.verdict).label,
+        }
+      : undefined,
+  })
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

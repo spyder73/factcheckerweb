@@ -7,6 +7,7 @@ import { ApiException } from '../types/api'
 import { useCheck } from '../hooks/useCheck'
 import { PipelineLog } from '../components/check/PipelineLog'
 import { ResultBlock } from '../components/check/ResultBlock'
+import { useHead } from '../utils/head'
 
 export default function CheckDetail() {
   const { id = '' } = useParams()
@@ -24,6 +25,7 @@ export default function CheckDetail() {
   // If the check is still processing, subscribe to the stream.
   const live = row && (row.status === 'pending' || row.status === 'processing')
   const stream = useCheck(live ? id : null)
+  useHead({ noindex: true })
 
   if (err) {
     return (
