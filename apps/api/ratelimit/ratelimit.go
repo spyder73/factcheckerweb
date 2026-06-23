@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -43,12 +44,16 @@ func Default() Limits {
 		"/auth/reset":   {"anon": {Max: 5, Window: time.Minute}},
 		"/auth/verify":  {"anon": {Max: 10, Window: time.Minute}},
 		"/auth/logout":  {"anon": {Max: 20, Window: time.Minute}, "free": {Max: 30, Window: time.Minute}},
+		// /api/check daily caps. Anon=3 is right for prod (forces signup) but
+		// painful for self-hosters iterating in dev — RATELIMIT_CHECK_ANON
+		// in .env overrides per tier. Plus has a smaller cap than BYOK
+		// because Plus uses pooled compute and Alethea pays.
 		"/api/check": {
-			"anon":  {Max: 3, Window: 24 * time.Hour},
-			"free":  {Max: 10, Window: 24 * time.Hour},
-			"byok":  {Max: 1000, Window: 24 * time.Hour},
-			"plus":  {Max: 100, Window: 24 * time.Hour},
-			"admin": {Max: 10000, Window: 24 * time.Hour},
+			"anon":  {Max: envInt("RATELIMIT_CHECK_ANON", 3), Window: 24 * time.Hour},
+			"free":  {Max: envInt("RATELIMIT_CHECK_FREE", 10), Window: 24 * time.Hour},
+			"byok":  {Max: envInt("RATELIMIT_CHECK_BYOK", 1000), Window: 24 * time.Hour},
+			"plus":  {Max: envInt("RATELIMIT_CHECK_PLUS", 100), Window: 24 * time.Hour},
+			"admin": {Max: envInt("RATELIMIT_CHECK_ADMIN", 10000), Window: 24 * time.Hour},
 		},
 		// GET / SSE on /api/check/{id}/* — cheap polls but unrestricted reads
 		// were a DoS vector (the UUID is the bearer; anyone with one could
@@ -178,17 +183,28 @@ func (l *Limiter) hit(ctx context.Context, endpoint, scopeKey string, limit Limi
 		}
 	}
 
-	// TTL = time until the OLDEST contributing bucket falls out of the window
-	// (i.e. one bucket-worth of quota becomes available). Reporting the
-	// current bucket's expiry would tell the client to retry too soon and
-	// they'd keep burning quota.
-	oldestBucket := currentBucket - int64(bucketsToSum-1)
-	oldestExpiry := time.Unix((oldestBucket+1)*int64(bucketSize.Seconds()), 0)
-	ttl = time.Until(oldestExpiry)
+	// TTL = time until the next bucket boundary rolls. That's the earliest
+	// moment any quota at all could free up; an honest "wait at least this
+	// long" for the client. Earlier code reported the END of the OLDEST
+	// contributing bucket, which is decades in the past — clamping to 1s
+	// produced misleading "retry in 1s" messages on daily limits.
+	currentBucketEnd := time.Unix((currentBucket+1)*int64(bucketSize.Seconds()), 0)
+	ttl = time.Until(currentBucketEnd)
 	if ttl < time.Second {
 		ttl = time.Second
 	}
 	return sum, ttl, nil
+}
+
+// envInt parses an env var as a positive int with a fallback. Used by Default()
+// to make daily caps tunable from .env without recompiling.
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
 }
 
 // scopeFromRequest returns (plan, scopeKey). Anonymous = ("anon", "ip:<ip>").

@@ -134,6 +134,42 @@ h1, h2, h3, h4 {
 }
 :focus:not(:focus-visible) { outline: none; }
 
+/* ----- Atmospheric depth (subtle, non-decorative) -----
+   Body background gets a very faint dotted grid + a single low-saturation
+   radial blob in the upper-right. Both are static (no animation) so the
+   page reads as "designed surface" not "blank canvas" without becoming
+   any kind of crypto-aurora. Dark + light tuned independently. */
+
+body {
+  background-image:
+    /* faint cobalt glow, top-right corner */
+    radial-gradient(
+      ellipse 1100px 700px at 85% -10%,
+      rgb(var(--color-accent) / var(--bg-glow-alpha, 0.06)) 0%,
+      transparent 60%
+    ),
+    /* dotted grid */
+    radial-gradient(
+      circle at center,
+      rgb(var(--color-border-subtle) / var(--bg-dot-alpha, 0.6)) 1px,
+      transparent 1.4px
+    );
+  background-size: auto, 28px 28px;
+  background-attachment: fixed, fixed;
+  background-repeat: no-repeat, repeat;
+}
+
+/* Dark mode: dots a bit more visible against the warm-black canvas, glow softer. */
+[data-theme="dark"] {
+  --bg-dot-alpha: 0.5;
+  --bg-glow-alpha: 0.07;
+}
+/* Light mode: dots subtler, glow barely there. */
+[data-theme="light"], :root:not([data-theme="dark"]) {
+  --bg-dot-alpha: 0.7;
+  --bg-glow-alpha: 0.045;
+}
+
 .hairline-grid {
   background-image:
     linear-gradient(to right, rgb(var(--color-border-subtle) / 0.5) 1px, transparent 1px),

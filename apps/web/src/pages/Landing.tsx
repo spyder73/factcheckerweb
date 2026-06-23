@@ -25,11 +25,18 @@ export default function Landing() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative">
-        <div className="absolute inset-0 hairline-grid opacity-30 pointer-events-none hidden lg:block" aria-hidden="true" />
+      <section className="relative overflow-hidden">
+        <div
+          className="absolute inset-0 hairline-grid pointer-events-none opacity-40 dark:opacity-30"
+          aria-hidden="true"
+          style={{ maskImage: 'radial-gradient(ellipse 800px 600px at 50% 30%, black 30%, transparent 80%)', WebkitMaskImage: 'radial-gradient(ellipse 800px 600px at 50% 30%, black 30%, transparent 80%)' }}
+        />
         <div className="relative mx-auto max-w-content px-4 lg:px-8 pt-20 pb-16 lg:pt-32">
           <div className="max-w-4xl">
-            <p className="text-eyebrow uppercase text-fg-muted mb-6">OPEN-SOURCE · EVIDENCE-BASED · SKEPTICAL BY DEFAULT</p>
+            <p className="inline-flex items-center gap-2 text-eyebrow uppercase text-fg-muted mb-6">
+              <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              OPEN-SOURCE · EVIDENCE-BASED · SKEPTICAL BY DEFAULT
+            </p>
             <h1 className="text-5xl lg:text-7xl font-bold text-fg-strong mb-8 tracking-tight">
               {t('landing.hero.headline')}
             </h1>
